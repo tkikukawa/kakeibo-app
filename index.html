@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#000000">
 <!-- app.js の APP_VERSION と必ず同じ値にする。
      食い違っていれば新旧が混ざっているので、app.js が自動で入れ直す。 -->
-<meta name="app-version" content="2026-08-14a">
+<meta name="app-version" content="2026-08-14c">
 <title>kakeibo</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=2026-08-14a">
+<link rel="stylesheet" href="style.css?v=2026-08-14c">
 </head>
 <body>
 
@@ -223,17 +223,17 @@
 
   <h2>GitHub</h2>
   <label class="field">オーナー
-    <input id="cfg-owner" type="text" autocomplete="off" placeholder="tkikukawa">
+    <input id="cfg-owner" type="text" autocomplete="off" placeholder="GitHubのユーザー名">
   </label>
   <label class="field">リポジトリ
-    <input id="cfg-repo" type="text" autocomplete="off" placeholder="kakeibo-data">
+    <input id="cfg-repo" type="text" autocomplete="off" placeholder="データ用リポジトリ名">
   </label>
   <label class="field">PAT
     <input id="cfg-token" type="password" autocomplete="off"
            placeholder="github_pat_…">
   </label>
   <p class="muted small">
-    fine-grained PAT を kakeibo-data のみ / Contents は Read and write で発行してください。
+    fine-grained PAT を、データ用リポジトリのみ / Contents は Read and write で発行してください。
     この端末の中だけに保存され、外部には送られません。
   </p>
   <button class="primary big-btn" id="cfg-save">保存して接続を確認</button>
@@ -247,6 +247,6 @@
   <button class="danger" id="cfg-forget">PAT をこの端末から消す</button>
 </section>
 
-<script type="module" src="app.js?v=2026-08-14a"></script>
+<script type="module" src="app.js?v=2026-08-14c"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-14a';
-import * as S from './store.js?v=2026-08-14a';
+import * as M from './model.js?v=2026-08-14c';
+import * as S from './store.js?v=2026-08-14c';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-14a';
+const APP_VERSION = '2026-08-14c';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -907,6 +907,31 @@ function renderSummary() {
   renderTrend(live);
 }
 
+// カテゴリの色。黒地(#000)向けに選び、検証スクリプトで
+// 明度帯・彩度・色覚多様性・背景との対比の全項目を通したもの。
+// 目視で足すと必ず崩れるので、増やすときは必ず再検証すること。
+//
+// 色は「金額の大小」ではなく「カテゴリ」に固定する。順位で塗り分けると、
+// 先月と見比べたときに同じ色が別のものを指してしまう。
+const CATEGORY_COLORS = {
+  food: '#C08019', // 琥珀
+  daily: '#0E9C80', // 青緑
+  eatout: '#CC5340', // 珊瑚
+  transport: '#4A7FD0', // 青
+  clothes: '#7A9E22', // 緑
+  fun: '#A652B2', // 紫
+};
+// 使途不明は支出の種類ではなく「情報が無い」状態なので、色を与えず沈める。
+const UNKNOWN_COLOR = '#4A4A4A';
+// 色は6つまで。増やすと判別できなくなる。棒には必ず名前と金額が付くので、
+// 同じ灰色でも読み違えることはない。
+const OTHER_COLOR = '#6E6E6E';
+
+function categoryColor(cat) {
+  if (cat === 'unknown' || cat === '(未分類)') return UNKNOWN_COLOR;
+  return CATEGORY_COLORS[cat] ?? OTHER_COLOR;
+}
+
 function renderBreakdown(live) {
   const box = $('sum-breakdown');
   box.replaceChildren();
@@ -920,12 +945,10 @@ function renderBreakdown(live) {
     $('sum-unknown').textContent = '';
     return;
   }
-  // 大きい順に明るくする。長さと明度で同じことを二重に伝える。
-  const shades = ['#ffffff', '#c8c8c8', '#9a9a9a', '#767676', '#5a5a5a', '#454545'];
   const max = rows[0][1];
   const sum = rows.reduce((s, [, v]) => s + v, 0);
 
-  rows.forEach(([cat, amount], i) => {
+  rows.forEach(([cat, amount]) => {
     const name = state.categories[cat]?.name ?? cat;
     const row = el('div', 'bar');
     const head = el('div', 'row');
@@ -934,7 +957,7 @@ function renderBreakdown(live) {
     const track = el('div', 'track');
     const fill = el('div', 'fill');
     fill.style.width = `${Math.max(2, (amount / max) * 100)}%`;
-    fill.style.background = shades[Math.min(i, shades.length - 1)];
+    fill.style.background = categoryColor(cat);
     track.append(fill);
     row.append(head, track);
     box.append(row);
@@ -1099,8 +1122,10 @@ async function confirmCategory(entry, category) {
 // --- 設定 -------------------------------------------------------------------
 async function renderSettings() {
   const c = S.config.get();
-  $('cfg-owner').value = c.owner ?? 'tkikukawa';
-  $('cfg-repo').value = c.repo ?? 'kakeibo-data';
+  // 既定値は入れない。このコードは public リポジトリに置かれるので、
+  // 書いた時点でユーザー名とデータ置き場の名前が世界に見えてしまう。
+  $('cfg-owner').value = c.owner ?? '';
+  $('cfg-repo').value = c.repo ?? '';
   $('cfg-token').value = c.token ?? '';
   $('cfg-version').textContent = `アプリの版: ${APP_VERSION}`;
   $('cfg-outbox').textContent = `未送信 ${await S.outbox.count()} 件`;
