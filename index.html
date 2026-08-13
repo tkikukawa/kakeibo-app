@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c1c1e">
+<title>kakeibo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="banner" class="banner" hidden></div>
+
+<!-- ホーム -->
+<section id="view-home" class="view">
+  <header class="head">
+    <div>
+      <div class="date" id="home-date"></div>
+      <div class="muted" id="home-sync">読み込み中…</div>
+    </div>
+    <button class="icon" data-go="settings" aria-label="設定">⚙</button>
+  </header>
+
+  <div class="stat">
+    <div class="muted">今月の支出</div>
+    <div class="big" id="home-month">—</div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" data-go="record">支出を記録</button>
+    <button class="primary" data-go="count">財布を数える</button>
+  </div>
+
+  <button class="tray" data-go="inbox">
+    <span>未処理トレイ</span>
+    <strong id="home-inbox">—</strong>
+  </button>
+
+  <h2>残高</h2>
+  <ul class="balances" id="home-balances"></ul>
+  <div class="networth">
+    <span>総資産</span><strong id="home-networth">—</strong>
+  </div>
+  <p class="muted small" id="home-check"></p>
+</section>
+
+<!-- 支出を記録 -->
+<section id="view-record" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">支出を記録</div>
+    <span></span>
+  </header>
+
+  <label class="amount">
+    <span class="yen">¥</span>
+    <input id="rec-amount" type="text" inputmode="numeric" pattern="[0-9]*"
+           placeholder="0" autocomplete="off" enterkeyhint="done">
+  </label>
+
+  <h2>支払い手段</h2>
+  <div class="chips" id="rec-accounts"></div>
+
+  <h2>店名</h2>
+  <input id="rec-merchant" type="text" placeholder="ローソン" autocomplete="off"
+         enterkeyhint="done">
+
+  <h2>カテゴリ <span class="muted small">後で決めてもいい</span></h2>
+  <div class="chips" id="rec-categories"></div>
+
+  <p class="muted small" id="rec-note"></p>
+  <button class="primary big-btn" id="rec-save">記録する</button>
+</section>
+
+<!-- 財布を数える -->
+<section id="view-count" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">財布を数える</div>
+    <span></span>
+  </header>
+
+  <div class="stat">
+    <div class="muted">アプリの予測</div>
+    <div class="big" id="count-predicted">—</div>
+  </div>
+
+  <h2>実際に数えた額</h2>
+  <label class="amount">
+    <span class="yen">¥</span>
+    <input id="count-actual" type="text" inputmode="numeric" pattern="[0-9]*"
+           placeholder="0" autocomplete="off" enterkeyhint="done">
+  </label>
+
+  <div class="diff" id="count-diff"></div>
+  <button class="primary big-btn" id="count-save">照合する</button>
+</section>
+
+<!-- 未処理トレイ -->
+<section id="view-inbox" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">未処理トレイ</div>
+    <span></span>
+  </header>
+  <div id="inbox-list"></div>
+</section>
+
+<!-- 設定 -->
+<section id="view-settings" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">設定</div>
+    <span></span>
+  </header>
+
+  <h2>GitHub</h2>
+  <label class="field">オーナー
+    <input id="cfg-owner" type="text" autocomplete="off" placeholder="tkikukawa">
+  </label>
+  <label class="field">リポジトリ
+    <input id="cfg-repo" type="text" autocomplete="off" placeholder="kakeibo-data">
+  </label>
+  <label class="field">PAT
+    <input id="cfg-token" type="password" autocomplete="off"
+           placeholder="github_pat_…">
+  </label>
+  <p class="muted small">
+    fine-grained PAT を kakeibo-data のみ / Contents は Read and write で発行してください。
+    この端末の中だけに保存され、外部には送られません。
+  </p>
+  <button class="primary big-btn" id="cfg-save">保存して接続を確認</button>
+  <p id="cfg-result" class="small"></p>
+
+  <h2>この端末</h2>
+  <p class="muted small" id="cfg-outbox"></p>
+  <button id="cfg-flush">未送信を今すぐ送る</button>
+  <button class="danger" id="cfg-forget">PAT をこの端末から消す</button>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
