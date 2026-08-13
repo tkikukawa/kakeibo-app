@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-14c';
-import * as S from './store.js?v=2026-08-14c';
+import * as M from './model.js?v=2026-08-14f';
+import * as S from './store.js?v=2026-08-14f';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-14c';
+const APP_VERSION = '2026-08-14f';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -108,6 +108,15 @@ const ACTIONS = {
     summaryMonth = next;
     renderSummary();
   },
+  'toggle-merchant'() {
+    const field = $('rec-merchant-field');
+    const btn = $('rec-merchant-toggle');
+    const open = field.hidden;
+    field.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    btn.textContent = open ? '− 店名を閉じる' : '＋ 店名を書く';
+    if (open) $('rec-merchant').focus();
+  },
   'add-income'() {
     addIncomeRow()?.querySelector('input').focus();
   },
@@ -138,6 +147,27 @@ function once(btn, fn) {
       btn.textContent = label;
     }
   };
+}
+
+// Enter（完了キー）を押したときの行き先を決める。
+// 何も繋がないとキーボードが開いたまま下のチップスを隠し続けるので、
+// 「キーボードを消す」という無駄な操作が毎回挟まる。
+//
+//   next    … その欄が開いていればフォーカスを送る
+//   submit  … 押されたボタンを実行する（最後の欄なのでそのまま保存）
+// どちらも当てはまらなければ、単にキーボードを閉じる。
+function wireEnter(id, { next, submit } = {}) {
+  const input = $(id);
+  if (!input) return;
+  const visible = (n) => n && !n.closest('[hidden]') && n.offsetParent !== null;
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const target = next ? $(next) : null;
+    if (visible(target)) return target.focus();
+    input.blur();
+    if (submit) $(submit)?.click();
+  });
 }
 
 let bannerTimer;
@@ -461,7 +491,9 @@ function renderRecord() {
   }
 
   $('rec-merchant-wrap').hidden = isTransfer;
-  $('rec-merchant-label').textContent = kind === 'income' ? '内容' : '店名';
+  $('rec-merchant-toggle').textContent = $('rec-merchant-field').hidden
+    ? (kind === 'income' ? '＋ 内容を書く' : '＋ 店名を書く')
+    : (kind === 'income' ? '− 内容を閉じる' : '− 店名を閉じる');
   $('rec-merchant').placeholder = kind === 'income' ? '給与' : 'ローソン';
   $('rec-title').textContent = { expense: '支出', income: '収入', transfer: '振替' }[kind];
 
@@ -522,6 +554,7 @@ $('rec-save').onclick = once($('rec-save'), async () => {
   localStorage.setItem(`kakeibo.lastAcct.${rec.kind}`, rec.account);
   $('rec-amount').value = '';
   $('rec-merchant').value = '';
+  $('rec-merchant-field').hidden = true;
   rec = { kind: rec.kind, account: null, counter: null, category: null };
   await commit([entry], `${label} ${M.yen(amount)} を記録しました`);
 });
@@ -1181,6 +1214,13 @@ window.addEventListener('offline', renderHome);
   show('home');
   if (!ok && !cached) banner('データを読み込めませんでした', 'err', 6000);
 })();
+
+// 金額欄: 店名を開いていればそこへ。開いていなければキーボードを閉じるだけ
+// （手段とカテゴリを選ぶ必要があるので、ここでは保存しない）
+wireEnter('rec-amount', { next: 'rec-merchant' });
+// 店名欄は経路の最後なので、空欄でもそのまま保存に進む
+wireEnter('rec-merchant', { submit: 'rec-save' });
+wireEnter('count-actual', { submit: 'count-save' });
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

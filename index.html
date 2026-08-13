@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#000000">
 <!-- app.js の APP_VERSION と必ず同じ値にする。
      食い違っていれば新旧が混ざっているので、app.js が自動で入れ直す。 -->
-<meta name="app-version" content="2026-08-14c">
+<meta name="app-version" content="2026-08-14f">
 <title>kakeibo</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=2026-08-14c">
+<link rel="stylesheet" href="style.css?v=2026-08-14f">
 </head>
 <body>
 
@@ -88,7 +88,7 @@
   <label class="amount">
     <span class="yen">¥</span>
     <input id="rec-amount" type="text" inputmode="numeric" pattern="[0-9]*"
-           placeholder="0" autocomplete="off" enterkeyhint="done">
+           placeholder="0" autocomplete="off" enterkeyhint="next">
   </label>
 
   <h2 id="rec-account-label">支払い手段</h2>
@@ -99,19 +99,26 @@
     <div class="chips" id="rec-counter"></div>
   </div>
 
-  <div id="rec-merchant-wrap">
-    <h2 id="rec-merchant-label">店名</h2>
-    <input id="rec-merchant" type="text" placeholder="ローソン" autocomplete="off"
-           enterkeyhint="done">
-  </div>
-
   <div id="rec-category-wrap">
     <h2>カテゴリ <span class="muted small">後で決めてもいい</span></h2>
     <div class="chips" id="rec-categories"></div>
   </div>
 
+  <!-- 店名は既定で閉じておく。文字入力はキーボードの切り替えを強制するので、
+       毎日の記録では一番重い操作になる。必要なときだけ開く。 -->
+  <div id="rec-merchant-wrap">
+    <button class="reveal" data-action="toggle-merchant" id="rec-merchant-toggle"
+            aria-expanded="false">＋ 店名を書く</button>
+    <div id="rec-merchant-field" hidden>
+      <input id="rec-merchant" type="text" placeholder="ローソン" autocomplete="off"
+             enterkeyhint="send">
+    </div>
+  </div>
+
   <p class="muted small" id="rec-note"></p>
-  <button class="primary big-btn" id="rec-save">記録する</button>
+  <div class="sticky-save">
+    <button class="primary" id="rec-save">記録する</button>
+  </div>
 </section>
 
 <!-- 財布を数える -->
@@ -135,7 +142,7 @@
   <label class="amount">
     <span class="yen">¥</span>
     <input id="count-actual" type="text" inputmode="numeric" pattern="[0-9]*"
-           placeholder="0" autocomplete="off" enterkeyhint="done">
+           placeholder="0" autocomplete="off" enterkeyhint="send">
   </label>
 
   <div class="diff" id="count-diff"></div>
@@ -247,6 +254,6 @@
   <button class="danger" id="cfg-forget">PAT をこの端末から消す</button>
 </section>
 
-<script type="module" src="app.js?v=2026-08-14c"></script>
+<script type="module" src="app.js?v=2026-08-14f"></script>
 </body>
 </html>

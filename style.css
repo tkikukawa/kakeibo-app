@@ -263,3 +263,13 @@ input[type=text], input[type=password] {
 .bars .meta { font-size: 11px; color: var(--muted); }
 .ends { display: flex; justify-content: space-between; margin-top: 2px; }
 .ends .meta { font-size: 11px; color: var(--muted); }
+
+/* 記録するボタンは常に指の届く位置に置く。下までスクロールさせない */
+.sticky-save {
+  position: sticky; bottom: 0; z-index: 5;
+  margin: 20px -16px 0; padding: 10px 16px calc(env(safe-area-inset-bottom) + 10px);
+  background: var(--bg); border-top: 1px solid var(--line);
+}
+.sticky-save .primary { width: 100%; }
+#rec-merchant-wrap { margin-top: 18px; }
+#rec-merchant-field { margin-top: 8px; }
