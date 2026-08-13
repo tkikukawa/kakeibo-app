@@ -120,6 +120,49 @@ export function monthTotal(entries, prefix) {
     .reduce((s, e) => s + e.amount, 0);
 }
 
+// 最初の残高は実際の収入ではないので、収入の集計からも外す。
+const isIncome = (e) => e.kind === 'income' && e.category !== 'opening';
+
+export function monthSummary(entries, month) {
+  const inMonth = (e) => e.date.startsWith(month);
+  const income = entries
+    .filter((e) => isIncome(e) && inMonth(e))
+    .reduce((s, e) => s + e.amount, 0);
+  const expense = entries
+    .filter((e) => isSpending(e) && inMonth(e))
+    .reduce((s, e) => s + e.amount, 0);
+  return { income, expense, net: income - expense };
+}
+
+// 今月のここまでのペースで行くと月末いくらになるか。
+// 日割りするだけだが、その日の使いすぎに一番効く数字なので前面に出す。
+// 月をまたいだ過去月には出さない（すでに確定しているため）。
+export function pace(entries, month, today) {
+  if (!today.startsWith(month)) return null;
+  const day = Number(today.slice(8, 10));
+  const [y, m] = month.split('-').map(Number);
+  const days = new Date(y, m, 0).getDate();
+  if (day < 3 || day >= days) return null; // 数日分では予測が暴れる
+  const spent = monthTotal(entries, month);
+  return { projected: Math.round((spent / day) * days), day, days };
+}
+
+// 記録のある月を古い順に。推移グラフを出してよいかの判定に使う。
+export function monthsWithData(entries) {
+  const set = new Set();
+  for (const e of entries) {
+    if (isSpending(e) || isIncome(e)) set.add(e.date.slice(0, 7));
+  }
+  return [...set].sort();
+}
+
+export function monthlyTotals(entries) {
+  return monthsWithData(entries).map((month) => ({
+    month,
+    ...monthSummary(entries, month),
+  }));
+}
+
 // 未処理トレイに出すもの。速報と、カテゴリ未確定の取込明細。
 export function inbox(entries) {
   return entries.filter(

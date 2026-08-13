@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-13i';
-import * as S from './store.js?v=2026-08-13i';
+import * as M from './model.js?v=2026-08-14a';
+import * as S from './store.js?v=2026-08-14a';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-13i';
+const APP_VERSION = '2026-08-14a';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -60,7 +60,7 @@ const CACHE = 'kakeibo.cache';
 const state = { accounts: {}, categories: {}, rules: [], entries: [], balances: {} };
 
 // --- 画面切り替え -----------------------------------------------------------
-const VIEWS = ['home', 'record', 'count', 'update', 'inbox', 'history', 'settings'];
+const VIEWS = ['home', 'record', 'count', 'update', 'summary', 'inbox', 'history', 'settings'];
 function show(name) {
   // 要素が欠けていても止まらないようにする。1つ足りないだけで
   // 画面遷移が丸ごと死ぬと、原因が分からない不具合になる。
@@ -72,6 +72,7 @@ function show(name) {
   if (name === 'record') renderRecord();
   if (name === 'count') renderCount();
   if (name === 'update') renderUpdate();
+  if (name === 'summary') renderSummary();
   if (name === 'inbox') renderInbox();
   if (name === 'history') renderHistory();
   if (name === 'settings') renderSettings();
@@ -95,6 +96,17 @@ const ACTIONS = {
     sessionStorage.removeItem('kakeibo.healed');
     await purgeCaches();
     location.reload();
+  },
+  'month-prev'() {
+    summaryMonth = shiftMonth(summaryMonth ?? M.today().slice(0, 7), -1);
+    renderSummary();
+  },
+  'month-next'() {
+    const next = shiftMonth(summaryMonth ?? M.today().slice(0, 7), 1);
+    // 未来の月には行かせない。空の画面を見せても意味がない
+    if (next > M.today().slice(0, 7)) return;
+    summaryMonth = next;
+    renderSummary();
   },
   'add-income'() {
     addIncomeRow()?.querySelector('input').focus();
@@ -856,6 +868,170 @@ $('update-save').onclick = once($('update-save'), async () => {
       : `${filled.length}口座をまとめて更新しました`
   );
 });
+
+// --- 集計 -------------------------------------------------------------------
+// 出すのは「正確に出せる数字」だけ。カテゴリ内訳は使途不明が大半を占めるが、
+// 隠さず出す。割合そのものが「記録がどれだけ雑か」の自己診断になる。
+// 推移グラフは比べる相手がいて初めて意味を持つので、2か月たまるまで出さない。
+let summaryMonth = null;
+
+function shiftMonth(month, delta) {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+const monthLabel = (m) => `${m.slice(0, 4)}年${Number(m.slice(5, 7))}月`;
+
+function renderSummary() {
+  const live = state.live ?? [];
+  const thisMonth = M.today().slice(0, 7);
+  if (!summaryMonth) summaryMonth = thisMonth;
+  $('sum-month').textContent = monthLabel(summaryMonth);
+
+  const { income, expense, net } = M.monthSummary(live, summaryMonth);
+  $('sum-expense').textContent = M.yen(expense);
+  $('sum-income').textContent = M.yen(income);
+  $('sum-expense2').textContent = M.yen(expense);
+  $('sum-net').textContent = `${net >= 0 ? '+' : '−'}${M.yen(Math.abs(net))}`;
+
+  // 月末予測。ここが一番その日の行動を変える数字なので上に置く。
+  const p = M.pace(live, summaryMonth, M.today());
+  $('sum-pace-wrap').hidden = !p;
+  if (p) {
+    $('sum-pace').textContent =
+      `${p.day}日時点。このペースだと月末 ${M.yen(p.projected)}`;
+  }
+
+  renderBreakdown(live);
+  renderTrend(live);
+}
+
+function renderBreakdown(live) {
+  const box = $('sum-breakdown');
+  box.replaceChildren();
+  const totals = M.spendingByCategory(live, {
+    from: `${summaryMonth}-01`,
+    to: `${summaryMonth}-31`,
+  });
+  const rows = Object.entries(totals);
+  if (rows.length === 0) {
+    box.append(el('p', 'empty', 'この月の支出はまだありません'));
+    $('sum-unknown').textContent = '';
+    return;
+  }
+  // 大きい順に明るくする。長さと明度で同じことを二重に伝える。
+  const shades = ['#ffffff', '#c8c8c8', '#9a9a9a', '#767676', '#5a5a5a', '#454545'];
+  const max = rows[0][1];
+  const sum = rows.reduce((s, [, v]) => s + v, 0);
+
+  rows.forEach(([cat, amount], i) => {
+    const name = state.categories[cat]?.name ?? cat;
+    const row = el('div', 'bar');
+    const head = el('div', 'row');
+    head.append(el('span', null, name));
+    head.append(el('span', 'meta', M.yen(amount)));
+    const track = el('div', 'track');
+    const fill = el('div', 'fill');
+    fill.style.width = `${Math.max(2, (amount / max) * 100)}%`;
+    fill.style.background = shades[Math.min(i, shades.length - 1)];
+    track.append(fill);
+    row.append(head, track);
+    box.append(row);
+  });
+
+  const unknown = (totals.unknown ?? 0) + (totals['(未分類)'] ?? 0);
+  $('sum-unknown').textContent = unknown
+    ? `使途不明が ${Math.round((unknown / sum) * 100)}%。記録を増やすとここが減ります`
+    : '';
+}
+
+// 総資産の推移。各月末までの記録だけで残高を出し直す。
+function netWorthByMonth(live, months) {
+  return months.map((m) => {
+    const end = `${m}-31`;
+    const upTo = live.filter((e) => e.date <= end);
+    try {
+      return { month: m, value: M.netWorth(M.computeBalances(state.accounts, upTo)) };
+    } catch {
+      return { month: m, value: 0 };
+    }
+  });
+}
+
+function renderTrend(live) {
+  const box = $('sum-trend');
+  box.replaceChildren();
+  const months = M.monthsWithData(live);
+  if (months.length < 2) {
+    box.append(el('h2', null, '推移'));
+    box.append(
+      el('p', 'muted small', '2か月分の記録がたまると、月ごとの支出と総資産の推移が出ます')
+    );
+    return;
+  }
+
+  const recent = months.slice(-6);
+  const totals = M.monthlyTotals(live).filter((t) => recent.includes(t.month));
+  const max = Math.max(...totals.map((t) => t.expense), 1);
+
+  box.append(el('h2', null, '月ごとの支出'));
+  const chart = el('div', 'bars');
+  for (const t of totals) {
+    const col = el('div', 'col');
+    const bar = el('div', 'colbar');
+    bar.style.height = `${Math.max(3, (t.expense / max) * 100)}%`;
+    if (t.month === summaryMonth) bar.classList.add('now');
+    const label = el('span', 'meta', `${Number(t.month.slice(5, 7))}月`);
+    col.append(bar, label);
+    col.title = `${monthLabel(t.month)} ${M.yen(t.expense)}`;
+    chart.append(col);
+  }
+  box.append(chart);
+
+  box.append(el('h2', null, '総資産の推移'));
+  const series = netWorthByMonth(live, recent);
+  const values = series.map((s) => s.value);
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const span = hi - lo || 1;
+  const pts = series.map((s, i) => {
+    const x = 8 + (i * 224) / Math.max(series.length - 1, 1);
+    const y = 54 - ((s.value - lo) / span) * 42;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 240 62');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '62');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute(
+    'aria-label',
+    `総資産は ${monthLabel(recent[0])} の ${M.yen(values[0])} から ` +
+      `${monthLabel(recent.at(-1))} の ${M.yen(values.at(-1))} へ推移`
+  );
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', pts.join(' '));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', '#ffffff');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('stroke-linejoin', 'round');
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  const [cx, cy] = pts.at(-1).split(',');
+  dot.setAttribute('cx', cx);
+  dot.setAttribute('cy', cy);
+  dot.setAttribute('r', '4');
+  dot.setAttribute('fill', '#ffffff');
+  svg.append(line, dot);
+  box.append(svg);
+
+  const ends = el('div', 'ends');
+  ends.append(el('span', 'meta', `${monthLabel(recent[0])} ${M.yen(values[0])}`));
+  ends.append(el('span', 'meta', M.yen(values.at(-1))));
+  box.append(ends);
+}
 
 // --- 未処理トレイ -----------------------------------------------------------
 function renderInbox() {

@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#000000">
 <!-- app.js の APP_VERSION と必ず同じ値にする。
      食い違っていれば新旧が混ざっているので、app.js が自動で入れ直す。 -->
-<meta name="app-version" content="2026-08-13i">
+<meta name="app-version" content="2026-08-14a">
 <title>kakeibo</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=2026-08-13i">
+<link rel="stylesheet" href="style.css?v=2026-08-14a">
 </head>
 <body>
 
@@ -45,6 +45,7 @@
   </nav>
 
   <nav class="menu sub">
+    <button data-go="summary"><span>集計</span><span class="caret" aria-hidden="true">›</span></button>
     <button data-go="inbox"><span>未処理</span><span class="tail"><span id="home-inbox">—</span><span class="caret" aria-hidden="true">›</span></span></button>
     <button data-go="history"><span>記録の履歴・修正</span><span class="caret" aria-hidden="true">›</span></button>
   </nav>
@@ -165,6 +166,43 @@
   <button class="primary big-btn" id="update-save">まとめて更新する</button>
 </section>
 
+<!-- 集計 -->
+<section id="view-summary" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">集計</div>
+    <span></span>
+  </header>
+
+  <div class="monthnav">
+    <button data-action="month-prev" aria-label="前の月">‹</button>
+    <span id="sum-month">—</span>
+    <button data-action="month-next" aria-label="次の月">›</button>
+  </div>
+
+  <div class="figures">
+    <div class="figure">
+      <div class="cap">この月の支出</div>
+      <div class="num" id="sum-expense">—</div>
+    </div>
+    <div class="figure sub" id="sum-pace-wrap" hidden>
+      <span id="sum-pace"></span>
+    </div>
+  </div>
+
+  <dl class="ledger">
+    <div><dt>収入</dt><dd id="sum-income">—</dd></div>
+    <div><dt>支出</dt><dd id="sum-expense2">—</dd></div>
+    <div class="total"><dt>差引</dt><dd id="sum-net">—</dd></div>
+  </dl>
+
+  <h2>内訳</h2>
+  <div id="sum-breakdown"></div>
+  <p class="muted small" id="sum-unknown"></p>
+
+  <div id="sum-trend"></div>
+</section>
+
 <!-- 未処理トレイ -->
 <section id="view-inbox" class="view" hidden>
   <header class="head">
@@ -209,6 +247,6 @@
   <button class="danger" id="cfg-forget">PAT をこの端末から消す</button>
 </section>
 
-<script type="module" src="app.js?v=2026-08-13i"></script>
+<script type="module" src="app.js?v=2026-08-14a"></script>
 </body>
 </html>
