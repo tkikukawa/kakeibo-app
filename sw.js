@@ -4,20 +4,13 @@
 
 // 上げると activate で古いキャッシュが全部消える。
 // アプリ本体を変えたら必ず上げること。
-const VERSION = 'kakeibo-v8';
-const SHELL = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './model.js',
-  './store.js',
-  './manifest.webmanifest',
-  './icon.svg',
-];
+const VERSION = 'kakeibo-v9';
+// 事前キャッシュはしない。サブリソースは ?v=版 付きで要求されるため、
+// ここに固定パスを並べると版の食い違いを自分で作り込むことになる。
+// ネットワーク優先の fetch ハンドラが、通った分だけキャッシュを育てる。
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (e) => {

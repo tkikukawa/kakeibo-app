@@ -1,5 +1,5 @@
-import * as M from './model.js';
-import * as S from './store.js';
+import * as M from './model.js?v=2026-08-13i';
+import * as S from './store.js?v=2026-08-13i';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-13h';
+const APP_VERSION = '2026-08-13i';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -41,7 +41,7 @@ function healVersionSkew() {
 // Service Worker のキャッシュだけ消しても足りない。GitHub Pages は
 // Cache-Control: max-age=600 を返すので、ブラウザ自身の HTTP キャッシュが
 // 10分間は古いファイルを返し続ける。cache:'reload' で取り直して上書きする。
-const SHELL = ['./', 'index.html', 'app.js', 'model.js', 'store.js', 'style.css', 'sw.js'];
+const SHELL = ['./', 'index.html', 'sw.js'];
 async function purgeCaches() {
   try {
     const regs = await navigator.serviceWorker.getRegistrations();
