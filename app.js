@@ -9,6 +9,10 @@ const el = (tag, cls, text) => {
   return n;
 };
 
+// 画面が古いままかを切り分けられるよう、設定画面に出す。
+// アプリ本体を変えたら sw.js の VERSION と一緒に上げること。
+const APP_VERSION = '2026-08-13b';
+
 const CACHE = 'kakeibo.cache';
 const state = { accounts: {}, categories: {}, rules: [], entries: [], balances: {} };
 
@@ -27,9 +31,38 @@ function show(name) {
   if (name === 'record') $('rec-amount').focus();
   if (name === 'count') $('count-actual').focus();
 }
+// クリックは要素に直接ぶら下げず、document で受けて振り分ける。
+// HTML と JS の版が食い違っても、少なくとも「押しても無反応」にはならない。
+const ACTIONS = {
+  'toggle-balance'() {
+    const shown = localStorage.getItem('kakeibo.showBalance') === '1';
+    localStorage.setItem('kakeibo.showBalance', shown ? '0' : '1');
+    renderHome();
+  },
+  // 古い版が残ってボタンが効かなくなったときの自力復旧手段。
+  // 記録データは GitHub にあるので、これで消えるのは画面のキャッシュだけ。
+  async 'hard-reload'() {
+    banner('最新版を取得しています…', 'warn', 0);
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch {
+      /* 使えない環境でもリロードは試す */
+    }
+    location.reload();
+  },
+};
 document.addEventListener('click', (e) => {
   const go = e.target.closest('[data-go]');
-  if (go) show(go.dataset.go);
+  if (go) return show(go.dataset.go);
+  const act = e.target.closest('[data-action]');
+  if (act) {
+    const fn = ACTIONS[act.dataset.action];
+    if (fn) fn(act);
+    else banner('この画面は古い版です。一度閉じて開き直してください', 'warn', 6000);
+  }
 });
 
 let bannerTimer;
@@ -188,13 +221,6 @@ async function refreshStatus() {
   line.textContent = text;
   line.style.color = bad || pending ? 'var(--danger)' : 'var(--muted)';
 }
-
-$('home-reveal').onclick = () => {
-  const shown = localStorage.getItem('kakeibo.showBalance') === '1';
-  localStorage.setItem('kakeibo.showBalance', shown ? '0' : '1');
-  renderHome();
-};
-$('home-history').onclick = () => show('history');
 
 // --- 記録の履歴・修正 -------------------------------------------------------
 // 追記のみを保つため、修正は「新しい行が古い行を無効にする」形で行う。
@@ -618,6 +644,7 @@ async function renderSettings() {
   $('cfg-owner').value = c.owner ?? 'tkikukawa';
   $('cfg-repo').value = c.repo ?? 'kakeibo-data';
   $('cfg-token').value = c.token ?? '';
+  $('cfg-version').textContent = `アプリの版: ${APP_VERSION}`;
   $('cfg-outbox').textContent = `未送信 ${await S.outbox.count()} 件`;
 }
 

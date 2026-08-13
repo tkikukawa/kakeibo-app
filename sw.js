@@ -2,7 +2,9 @@
 // アプリ本体だけをキャッシュし、GitHub API は絶対にキャッシュしない
 // （古い残高を正しい残高として見せてしまうため）。
 
-const VERSION = 'kakeibo-v1';
+// 上げると activate で古いキャッシュが全部消える。
+// アプリ本体を変えたら必ず上げること。
+const VERSION = 'kakeibo-v2';
 const SHELL = [
   './',
   './index.html',

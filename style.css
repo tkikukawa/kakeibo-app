@@ -128,9 +128,11 @@ input[type=text], input[type=password] {
   padding: 10px 14px; border-radius: 999px; font-size: 15px;
   border: 1px solid var(--line); background: var(--card); min-height: 44px;
 }
-/* 支出 / 収入 / 振替 の切り替え。3等分して押し間違えにくくする */
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 16px; }
-.seg .chip { border-radius: var(--radius); text-align: center; min-height: 48px; font-size: 16px; }
+/* 支出 / 収入 / 振替 の切り替え。ほぼ常に「支出」なので控えめにし、
+   選ばなくてもそのまま金額を打てることが見た目で分かるようにする */
+.seg { display: flex; gap: 6px; margin: 0 0 12px; }
+.seg .chip { padding: 6px 14px; min-height: 34px; font-size: 13px; color: var(--muted); }
+.seg .chip[aria-pressed=true] { font-size: 13px; }
 
 .chip[aria-pressed=true] {
   background: var(--accent-bg); border-color: var(--accent); color: var(--accent);

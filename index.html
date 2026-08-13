@@ -37,13 +37,13 @@
     <strong id="home-inbox">—</strong>
   </button>
 
-  <button class="link-row" id="home-history">
+  <button class="link-row" data-go="history">
     <span>記録の履歴・修正</span><span aria-hidden="true">›</span>
   </button>
 
   <h2 class="reveal-head">
     <span>残高</span>
-    <button class="reveal" id="home-reveal" aria-pressed="false">表示する</button>
+    <button class="reveal" id="home-reveal" data-action="toggle-balance" aria-pressed="false">表示する</button>
   </h2>
   <div id="home-balance-wrap" hidden>
     <ul class="balances" id="home-balances"></ul>
@@ -168,8 +168,10 @@
   <p id="cfg-result" class="small"></p>
 
   <h2>この端末</h2>
+  <p class="muted small" id="cfg-version"></p>
   <p class="muted small" id="cfg-outbox"></p>
   <button id="cfg-flush">未送信を今すぐ送る</button>
+  <button data-action="hard-reload">アプリを最新にする</button>
   <button class="danger" id="cfg-forget">PAT をこの端末から消す</button>
 </section>
 
