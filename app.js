@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-13f';
+const APP_VERSION = '2026-08-13g';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -32,17 +32,28 @@ function healVersionSkew() {
   }
   sessionStorage.setItem('kakeibo.healed', '1');
   (async () => {
-    try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    } catch {
-      /* 使えない環境でもリロードは試す */
-    }
+    await purgeCaches();
     location.reload();
   })();
   return true;
+}
+
+// Service Worker のキャッシュだけ消しても足りない。GitHub Pages は
+// Cache-Control: max-age=600 を返すので、ブラウザ自身の HTTP キャッシュが
+// 10分間は古いファイルを返し続ける。cache:'reload' で取り直して上書きする。
+const SHELL = ['./', 'index.html', 'app.js', 'model.js', 'store.js', 'style.css', 'sw.js'];
+async function purgeCaches() {
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch {
+    /* 使えない環境でも下の取り直しは試す */
+  }
+  await Promise.all(
+    SHELL.map((f) => fetch(f, { cache: 'reload' }).catch(() => {}))
+  );
 }
 
 const CACHE = 'kakeibo.cache';
@@ -81,14 +92,8 @@ const ACTIONS = {
   // 記録データは GitHub にあるので、これで消えるのは画面のキャッシュだけ。
   async 'hard-reload'() {
     banner('最新版を取得しています…', 'warn', 0);
-    try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    } catch {
-      /* 使えない環境でもリロードは試す */
-    }
+    sessionStorage.removeItem('kakeibo.healed');
+    await purgeCaches();
     location.reload();
   },
   'add-income'() {

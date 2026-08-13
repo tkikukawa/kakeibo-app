@@ -89,10 +89,15 @@ export function checkInvariant(accounts, entries, balances) {
   return actual === expected ? null : { expected, actual };
 }
 
+// 期首残高は「使ったお金」ではない。クレジットカードの期首は符号の都合で
+// expense として記録されるが、支出の集計に混ぜると今月いきなり数十万使ったように
+// 見えてしまう。残高の計算には要るので、集計側だけで除く。
+const isSpending = (e) => e.kind === 'expense' && e.category !== 'opening';
+
 export function spendingByCategory(entries, { from, to } = {}) {
   const totals = {};
   for (const e of entries) {
-    if (e.kind !== 'expense') continue;
+    if (!isSpending(e)) continue;
     if (from && e.date < from) continue;
     if (to && e.date > to) continue;
     const cat = e.category || '(未分類)';
@@ -104,7 +109,7 @@ export function spendingByCategory(entries, { from, to } = {}) {
 // prefix が '2026-08' なら月、'2026-08-13' ならその日の支出合計になる
 export function monthTotal(entries, prefix) {
   return entries
-    .filter((e) => e.kind === 'expense' && e.date.startsWith(prefix))
+    .filter((e) => isSpending(e) && e.date.startsWith(prefix))
     .reduce((s, e) => s + e.amount, 0);
 }
 
