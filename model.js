@@ -101,9 +101,10 @@ export function spendingByCategory(entries, { from, to } = {}) {
   return Object.fromEntries(Object.entries(totals).sort((a, b) => b[1] - a[1]));
 }
 
-export function monthTotal(entries, month) {
+// prefix が '2026-08' なら月、'2026-08-13' ならその日の支出合計になる
+export function monthTotal(entries, prefix) {
   return entries
-    .filter((e) => e.kind === 'expense' && e.date.startsWith(month))
+    .filter((e) => e.kind === 'expense' && e.date.startsWith(prefix))
     .reduce((s, e) => s + e.amount, 0);
 }
 

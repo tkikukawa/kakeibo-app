@@ -15,36 +15,42 @@
 <!-- ホーム -->
 <section id="view-home" class="view">
   <header class="head">
-    <div>
-      <div class="date" id="home-date"></div>
-      <div class="muted" id="home-sync">読み込み中…</div>
-    </div>
-    <button class="icon" data-go="settings" aria-label="設定">⚙</button>
+    <div class="date" id="home-date"></div>
+    <button class="icon" data-go="settings" aria-label="設定">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 8.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9.4a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+      </svg>
+    </button>
   </header>
 
-  <div class="stat">
-    <div class="muted">今月の支出</div>
-    <div class="big" id="home-month">—</div>
+  <div class="figures">
+    <div class="figure">
+      <div class="cap">今日の支出</div>
+      <div class="num" id="home-today">—</div>
+    </div>
+    <div class="figure">
+      <div class="cap">今月の支出</div>
+      <div class="num" id="home-month">—</div>
+    </div>
   </div>
 
-  <div class="actions">
-    <button class="primary" data-go="record">記録する</button>
-    <button class="primary" data-go="count">財布を数える</button>
-  </div>
+  <nav class="menu">
+    <button data-go="record"><span>支出を記録</span><span class="caret" aria-hidden="true">›</span></button>
+    <button data-go="count"><span>財布を数える</span><span class="caret" aria-hidden="true">›</span></button>
+    <button data-go="update"><span>口座情報を更新</span><span class="caret" aria-hidden="true">›</span></button>
+  </nav>
 
-  <button class="tray" data-go="inbox">
-    <span>未処理トレイ</span>
-    <strong id="home-inbox">—</strong>
-  </button>
+  <nav class="menu sub">
+    <button data-go="inbox"><span>未処理</span><span class="tail"><span id="home-inbox">—</span><span class="caret" aria-hidden="true">›</span></span></button>
+    <button data-go="history"><span>記録の履歴・修正</span><span class="caret" aria-hidden="true">›</span></button>
+  </nav>
 
-  <button class="link-row" data-go="history">
-    <span>記録の履歴・修正</span><span aria-hidden="true">›</span>
-  </button>
-
-  <h2 class="reveal-head">
+  <div class="reveal-head">
     <span>残高</span>
     <button class="reveal" id="home-reveal" data-action="toggle-balance" aria-pressed="false">表示する</button>
-  </h2>
+  </div>
   <div id="home-balance-wrap" hidden>
     <ul class="balances" id="home-balances"></ul>
     <div class="networth">
@@ -52,6 +58,7 @@
     </div>
     <p class="muted small" id="home-check"></p>
   </div>
+  <p class="muted small foot" id="home-sync">読み込み中…</p>
 </section>
 
 <!-- 記録の履歴 -->
@@ -129,6 +136,33 @@
 
   <div class="diff" id="count-diff"></div>
   <button class="primary big-btn" id="count-save">照合する</button>
+</section>
+
+<!-- 口座情報を更新（月末の一括照合） -->
+<section id="view-update" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">口座情報を更新</div>
+    <span></span>
+  </header>
+  <p class="muted small">
+    いまの残高をまとめて入れてください。空欄の口座はそのままです。
+    <strong>全部いっぺんに入れると、ATM出金などの振替が自動で相殺されます。</strong>
+  </p>
+  <div id="update-list"></div>
+
+  <h2>この期間に入った収入</h2>
+  <p class="muted small">
+    給与など。<strong>これを入れないと支出が実際より少なく出ます。</strong>
+    無ければ空欄のままで構いません。
+  </p>
+  <div class="acct">
+    <input id="update-income" type="text" inputmode="numeric" placeholder="空欄なら収入なし"
+           autocomplete="off">
+    <div class="chips" id="update-income-account" style="margin-top:10px"></div>
+  </div>
+
+  <button class="primary big-btn" id="update-save">まとめて更新する</button>
 </section>
 
 <!-- 未処理トレイ -->

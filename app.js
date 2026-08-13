@@ -11,18 +11,19 @@ const el = (tag, cls, text) => {
 
 // 画面が古いままかを切り分けられるよう、設定画面に出す。
 // アプリ本体を変えたら sw.js の VERSION と一緒に上げること。
-const APP_VERSION = '2026-08-13b';
+const APP_VERSION = '2026-08-13c';
 
 const CACHE = 'kakeibo.cache';
 const state = { accounts: {}, categories: {}, rules: [], entries: [], balances: {} };
 
 // --- 画面切り替え -----------------------------------------------------------
-const VIEWS = ['home', 'record', 'count', 'inbox', 'history', 'settings'];
+const VIEWS = ['home', 'record', 'count', 'update', 'inbox', 'history', 'settings'];
 function show(name) {
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
   window.scrollTo(0, 0);
   if (name === 'record') renderRecord();
   if (name === 'count') renderCount();
+  if (name === 'update') renderUpdate();
   if (name === 'inbox') renderInbox();
   if (name === 'history') renderHistory();
   if (name === 'settings') renderSettings();
@@ -176,8 +177,9 @@ function renderHome() {
   const w = '日月火水木金土'[now.getDay()];
   $('home-date').textContent = `${now.getMonth() + 1}月${now.getDate()}日 (${w})`;
 
-  const month = M.today().slice(0, 7);
-  $('home-month').textContent = M.yen(M.monthTotal(state.live ?? [], month));
+  const today = M.today();
+  $('home-today').textContent = M.yen(M.monthTotal(state.live ?? [], today));
+  $('home-month').textContent = M.yen(M.monthTotal(state.live ?? [], today.slice(0, 7)));
   $('home-inbox').textContent = `${M.inbox(state.live ?? []).length} 件`;
 
   // 残高は既定で隠す。人前で開いても金額が見えないようにするため。
@@ -500,12 +502,13 @@ const COUNT_UI = {
 const countUi = () => COUNT_UI[state.accounts[countAccount]?.type] ?? COUNT_UI.cash;
 const isCreditCount = () => state.accounts[countAccount]?.type === 'credit';
 
-// その口座に記録が1件も無ければ、これは期首残高の設定。
-// 差額を「不明な増加」ではなく「期首残高」として計上し、収入統計を汚さない。
+// その口座をまだ一度も照合していなければ、これは期首残高の設定。
+//
+// 「記録が1件も無いこと」を条件にすると、支出だけ先に記録していた口座で
+// 初回の照合が普通の照合として扱われ、本来の期首残高が丸ごと
+// 「不明な増加」に化ける。基準を決めるのは最初の照合なので、そこで判定する。
 const isOpening = () =>
-  !(state.live ?? []).some(
-    (e) => e.account === countAccount || e.counter_account === countAccount
-  );
+  !(state.live ?? []).some((e) => e.kind === 'count' && e.account === countAccount);
 
 // credit は残高が負なので、入力も表示も「未払額」として正の数で扱う
 const predictedRaw = () => state.balances[countAccount] ?? 0;
@@ -555,20 +558,24 @@ function updateDiff() {
 }
 $('count-actual').addEventListener('input', updateDiff);
 
-$('count-save').onclick = once($('count-save'), async () => {
-  const raw = ($('count-actual').value || '').replace(/[^0-9]/g, '');
-  if (raw === '') return banner('金額を入力してください', 'err');
-  const actual = isCreditCount() ? -parseInt(raw, 10) : parseInt(raw, 10);
-  const diff = predictedRaw() - actual;
-  const name = state.accounts[countAccount].name;
-  const base = { ts: M.nowTs(), date: M.today(), account: countAccount, source: 'manual' };
+// 照合1件分のエントリを組み立てる。1口座ずつの画面と一括更新画面で共有する。
+// 期首か通常かの分岐が2箇所に散ると必ず食い違うので、ここ1本に集める。
+//
+// count は実残高の宣言で、残高そのものは動かさない。差額は別の行として
+// 計上する。2行に分けておくと、何が起きたかがログだけで追える。
+function reconcileEntries(accountId, entered, balances = state.balances) {
+  const acc = state.accounts[accountId];
+  const isCredit = acc.type === 'credit';
+  const actual = isCredit ? -entered : entered;
+  const diff = (balances[accountId] ?? 0) - actual;
+  const opening = !(state.live ?? []).some(
+    (e) => e.kind === 'count' && e.account === accountId
+  );
+  const base = { ts: M.nowTs(), date: M.today(), account: accountId, source: 'manual' };
 
-  // count は実残高の宣言。残高そのものは動かさず、差額を別の行で計上する。
-  // 何が起きたかがログだけで追えるようにするため、2行に分けている。
   const entries = [
     { ...base, id: M.ulid(), kind: 'count', amount: Math.abs(actual), status: 'confirmed' },
   ];
-  const opening = isOpening();
   if (diff !== 0) {
     entries.push({
       ...base,
@@ -578,9 +585,16 @@ $('count-save').onclick = once($('count-save'), async () => {
       category: opening ? 'opening' : diff > 0 ? 'unknown' : 'unknown_income',
       status: 'confirmed',
       source: 'reconcile',
-      memo: opening ? `${name}の期首残高` : `${name}の照合による調整`,
+      memo: opening ? `${acc.name}の期首残高` : `${acc.name}の照合による調整`,
     });
   }
+  return { entries, diff, opening, name: acc.name };
+}
+
+$('count-save').onclick = once($('count-save'), async () => {
+  const raw = ($('count-actual').value || '').replace(/[^0-9]/g, '');
+  if (raw === '') return banner('金額を入力してください', 'err');
+  const { entries, diff, opening, name } = reconcileEntries(countAccount, parseInt(raw, 10));
   $('count-actual').value = '';
   await commit(
     entries,
@@ -589,6 +603,105 @@ $('count-save').onclick = once($('count-save'), async () => {
       : diff === 0
         ? `${name}: ぴったり合っています`
         : `${name} を照合しました`
+  );
+});
+
+// --- 口座情報を更新（まとめて照合）-----------------------------------------
+// 現金だけ入れてもいいし、全部入れてもいい。空欄の口座は触らない。
+// 全部まとめて入れると、口座間の移動(ATM出金など)が自動的に相殺される。
+function renderUpdate() {
+  const box = $('update-list');
+  box.replaceChildren();
+  // 現金を先頭に。普段は現金だけ触ることが多いため。
+  const accounts = Object.entries(state.accounts)
+    .filter(([, a]) => M.isTracked(a))
+    .sort(([, a], [, b]) => (a.type === 'cash' ? -1 : b.type === 'cash' ? 1 : 0));
+
+  for (const [id, acc] of accounts) {
+    const isCredit = acc.type === 'credit';
+    const row = el('div', 'acct');
+    const head = el('div', 'row');
+    head.append(el('span', 'name', acc.name));
+    head.append(
+      el('span', 'meta', isCredit ? '未払額' : COUNT_UI[acc.type]?.label ?? '残高')
+    );
+    row.append(head);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.dataset.account = id;
+    input.placeholder = '空欄なら変更しません';
+    row.append(input);
+
+    const note = el('div', 'meta acct-note');
+    input.addEventListener('input', () => {
+      const raw = input.value.replace(/[^0-9]/g, '');
+      if (!raw) return (note.textContent = '');
+      const { diff, opening } = reconcileEntries(id, parseInt(raw, 10));
+      note.textContent = opening
+        ? '期首残高として設定します'
+        : diff === 0
+          ? 'ぴったり合っています'
+          : diff > 0
+            ? `${M.yen(diff)} の記録漏れ → 使途不明`
+            : `${M.yen(-diff)} 多い → 不明な増加`;
+    });
+    row.append(note);
+    box.append(row);
+  }
+
+  // 収入の入金先。既定は最初の銀行口座。
+  const banks = accounts.filter(([, a]) => a.type === 'bank');
+  const choices = (banks.length ? banks : accounts).map(([id, a]) => [id, a.name]);
+  if (!updateIncomeAccount || !state.accounts[updateIncomeAccount]) {
+    updateIncomeAccount = choices[0]?.[0] ?? null;
+  }
+  chipRow($('update-income-account'), choices, updateIncomeAccount, (v) => {
+    updateIncomeAccount = v;
+    renderUpdate();
+  });
+  $('update-income').value = '';
+}
+
+let updateIncomeAccount = null;
+
+$('update-save').onclick = once($('update-save'), async () => {
+  const inputs = [...$('update-list').querySelectorAll('input[data-account]')];
+  const filled = inputs.filter((i) => i.value.replace(/[^0-9]/g, '') !== '');
+  const incomeRaw = ($('update-income').value || '').replace(/[^0-9]/g, '');
+  if (filled.length === 0 && !incomeRaw) return banner('1つ以上入力してください', 'err');
+
+  // 収入を先に確定させ、それを反映した残高と実額を突き合わせる。
+  //   支出 = 期首 + 収入 − 現在の総資産
+  // 収入を後回しにすると、その分が丸ごと「使途不明の支出」に化ける。
+  const entries = [];
+  if (incomeRaw && updateIncomeAccount) {
+    entries.push({
+      id: M.ulid(),
+      ts: M.nowTs(),
+      date: M.today(),
+      kind: 'income',
+      amount: parseInt(incomeRaw, 10),
+      account: updateIncomeAccount,
+      category: 'income_salary',
+      status: 'confirmed',
+      source: 'manual',
+    });
+  }
+  const balances = M.computeBalances(state.accounts, [...(state.live ?? []), ...entries]);
+
+  for (const input of filled) {
+    const value = parseInt(input.value.replace(/[^0-9]/g, ''), 10);
+    entries.push(...reconcileEntries(input.dataset.account, value, balances).entries);
+  }
+
+  const partial = filled.length > 0 && filled.length < inputs.length;
+  await commit(
+    entries,
+    partial
+      ? `${filled.length}口座を更新しました（一部のみ）`
+      : `${filled.length}口座をまとめて更新しました`
   );
 });
 

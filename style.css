@@ -66,6 +66,28 @@ h2 {
 }
 .big { font-size: 32px; font-weight: 500; letter-spacing: -.01em; }
 
+/* ホーム。枠で囲わず、余白と細い罫線だけで区切る */
+.figures { display: grid; gap: 22px; margin: 26px 0 34px; }
+.figure .cap { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.figure .num {
+  font-size: 34px; font-weight: 500; letter-spacing: -.02em; line-height: 1.15;
+  font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.figure:nth-child(2) .num { font-size: 26px; color: var(--muted); }
+
+.menu { display: block; margin-bottom: 30px; }
+.menu button {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: none; border: none; border-bottom: 1px solid var(--line);
+  border-radius: 0; padding: 16px 2px; font-size: 16px; min-height: 56px;
+}
+.menu button:active { background: var(--card); }
+.menu.sub button { font-size: 14px; color: var(--muted); padding: 13px 2px; min-height: 48px; }
+.menu .caret { color: var(--muted); font-size: 18px; }
+.menu .tail { display: flex; align-items: center; gap: 10px; }
+
+.foot { margin-top: 28px; }
+
 .actions { display: grid; gap: 10px; }
 button {
   font: inherit; cursor: pointer; border-radius: var(--radius);
@@ -139,14 +161,29 @@ input[type=text], input[type=password] {
   font-weight: 500;
 }
 
+/* 口座情報の一括更新。1行1口座 */
+.acct {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px;
+}
+.acct .row { display: flex; justify-content: space-between; align-items: baseline; }
+.acct .name { font-weight: 500; }
+.acct .meta { font-size: 12px; color: var(--muted); }
+.acct input { margin-top: 8px; }
+.acct-note { margin-top: 6px; min-height: 18px; }
+
 .link-row {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   margin-top: 10px; font-size: 15px; color: var(--muted);
 }
-.reveal-head { display: flex; align-items: center; justify-content: space-between; }
+.reveal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--muted); letter-spacing: .04em;
+}
 .reveal {
-  padding: 6px 12px; min-height: 36px; font-size: 13px; border-radius: 999px;
-  color: var(--muted);
+  padding: 6px 0; min-height: 36px; font-size: 12px; border: none;
+  background: none; color: var(--muted); text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* 履歴の1件。タップで修正パネルが開く */
