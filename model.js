@@ -43,6 +43,13 @@ export function liveEntries(entries) {
   });
 }
 
+// その記録が「何月分」か。
+// カードは締め日の都合で、8月に7月分の請求を記入することがある。
+// month を持たない古い記録は、記入した日の月をそのまま使う。
+export function entryMonth(e) {
+  return e.month ?? e.date.slice(0, 7);
+}
+
 export function sortEntries(entries) {
   return [...entries].sort((a, b) =>
     a.date === b.date ? a.ts.localeCompare(b.ts) : a.date.localeCompare(b.date)

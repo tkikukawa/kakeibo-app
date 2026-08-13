@@ -165,7 +165,12 @@ input[type=text], input[type=password] {
 .acct .row { display: flex; justify-content: space-between; align-items: baseline; }
 .acct .name { font-weight: 500; }
 .acct .meta { font-size: 12px; color: var(--muted); }
-.acct input { margin-top: 8px; }
+.acct input, .acct select { margin-top: 8px; }
+.acct select {
+  width: 100%; font: inherit; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px 14px; min-height: 48px;
+}
 /* 今月すでに記入済みのカード。押せないことが見て分かるようにする */
 .acct input:disabled { color: var(--muted); background: var(--bg); opacity: 1; }
 .acct-note { margin-top: 6px; min-height: 18px; }

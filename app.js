@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-13g';
+const APP_VERSION = '2026-08-13h';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -566,7 +566,7 @@ function renderCount() {
   countAccount = 'cash';
   const ui = countUi();
   const opening = isOpening();
-  $('count-title').textContent = opening ? '期首残高を入れる' : ui.title;
+  $('count-title').textContent = opening ? '最初の残高を入れる' : ui.title;
   $('count-label').textContent = opening ? ui.openLabel : ui.label;
   $('count-predicted').textContent = M.yen(predictedShown());
   updateDiff();
@@ -587,7 +587,7 @@ function updateDiff() {
   const diff = predictedRaw() - actual;
   box.className = diff === 0 ? 'diff' : 'diff on';
   box.textContent = opening
-    ? `期首残高として ${M.yen(Math.abs(actual))} を設定します`
+    ? `最初の残高として ${M.yen(Math.abs(actual))} を設定します`
     : diff === 0
       ? 'ぴったり合っています'
       : diff > 0
@@ -604,7 +604,7 @@ $('count-actual').addEventListener('input', updateDiff);
 //
 // count は実残高の宣言で、残高そのものは動かさない。差額は別の行として
 // 計上する。2行に分けておくと、何が起きたかがログだけで追える。
-function reconcileEntries(accountId, entered, balances = state.balances) {
+function reconcileEntries(accountId, entered, balances = state.balances, month = null) {
   const acc = state.accounts[accountId];
   const isCredit = acc.type === 'credit';
   const actual = isCredit ? -entered : entered;
@@ -612,7 +612,14 @@ function reconcileEntries(accountId, entered, balances = state.balances) {
   const opening = !(state.live ?? []).some(
     (e) => e.kind === 'count' && e.account === accountId
   );
-  const base = { ts: M.nowTs(), date: M.today(), account: accountId, source: 'manual' };
+  const base = {
+    ts: M.nowTs(),
+    date: dateForMonth(month),
+    account: accountId,
+    source: 'manual',
+  };
+  // 何月分かを明示しておく。8月に7月分の請求を記入することがあるため。
+  if (month) base.month = month;
 
   const entries = [
     { ...base, id: M.ulid(), kind: 'count', amount: Math.abs(actual), status: 'confirmed' },
@@ -626,7 +633,7 @@ function reconcileEntries(accountId, entered, balances = state.balances) {
       category: opening ? 'opening' : diff > 0 ? 'unknown' : 'unknown_income',
       status: 'confirmed',
       source: 'reconcile',
-      memo: opening ? `${acc.name}の期首残高` : `${acc.name}の照合による調整`,
+      memo: opening ? `${acc.name}の最初の残高` : `${acc.name}の照合による調整`,
     });
   }
   return { entries, diff, opening, name: acc.name };
@@ -640,20 +647,39 @@ $('count-save').onclick = once($('count-save'), async () => {
   await commit(
     entries,
     opening
-      ? `${name} の期首残高を設定しました`
+      ? `${name} の最初の残高を設定しました`
       : diff === 0
         ? `${name}: ぴったり合っています`
         : `${name} を照合しました`
   );
 });
 
-// その口座を今月すでに照合したか。
-// カードは締め日が月1回なので、記入も月1回に制限する根拠に使う。
-function doneThisMonth(accountId) {
-  const month = M.today().slice(0, 7);
+// 「◯月分」として記録するときの日付。
+// 過去の月を選んだらその月の末日にする。そうしないと7月分の請求が
+// 8月の支出として集計されてしまう。今月ならそのまま今日。
+function dateForMonth(month) {
+  const today = M.today();
+  if (!month || month === today.slice(0, 7)) return today;
+  const [y, m] = month.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate(); // 翌月0日 = 当月末日
+  return `${month}-${String(last).padStart(2, '0')}`;
+}
+
+// その口座の「◯月分」をすでに記録したか。
+// カードは締め日が月1回なので、月ごとに1回だけ記入できるようにする。
+function doneForMonth(accountId, month) {
   return (state.live ?? []).some(
-    (e) => e.kind === 'count' && e.account === accountId && e.date.startsWith(month)
+    (e) => e.kind === 'count' && e.account === accountId && M.entryMonth(e) === month
   );
+}
+
+// 月の選択肢。今月から遡って6か月分。
+function monthOptions() {
+  const [y, m] = M.today().slice(0, 7).split('-').map(Number);
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(y, m - 1 - i, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
 }
 
 // --- 口座情報を更新（まとめて照合）-----------------------------------------
@@ -682,31 +708,60 @@ function renderUpdate() {
     input.inputMode = 'numeric';
     input.dataset.account = id;
     input.placeholder = '空欄なら変更しません';
-    // カードは月に1回しか記入しない。締め日の途中で照合すると、
-    // 支出でも何でもない差額が「使途不明」として積まれてしまう。
-    if (isCredit && doneThisMonth(id)) {
-      input.disabled = true;
-      input.placeholder = '今月は記入済み';
-    }
-    row.append(input);
 
     const note = el('div', 'meta acct-note');
-    if (input.disabled) {
-      note.textContent = '今月は記入済みです。直すなら「記録の履歴・修正」から';
+
+    // カードは月に1回しか記入しない。締め日の途中で照合すると、支出でも
+    // 何でもない差額が「使途不明」として積まれてしまう。
+    // どの月の請求かを選べるようにし、その月がすでに埋まっていれば閉じる。
+    let monthSel = null;
+    if (isCredit) {
+      monthSel = document.createElement('select');
+      for (const m of monthOptions()) {
+        const o = document.createElement('option');
+        o.value = m;
+        const [y, mm] = m.split('-');
+        o.textContent = `${y}年${Number(mm)}月分`;
+        monthSel.append(o);
+      }
+      input.dataset.month = monthSel.value;
+      row.append(monthSel);
     }
+
+    const applyLock = () => {
+      if (!isCredit) return;
+      input.dataset.month = monthSel.value;
+      const taken = doneForMonth(id, monthSel.value);
+      input.disabled = taken;
+      input.value = taken ? '' : input.value;
+      input.placeholder = taken ? '記入済み' : '空欄なら変更しません';
+      note.textContent = taken
+        ? 'この月はすでに記入済みです。直すなら「記録の履歴・修正」から'
+        : '';
+    };
+    if (monthSel) monthSel.addEventListener('change', applyLock);
+
+    row.append(input, note);
+
     input.addEventListener('input', () => {
       const raw = input.value.replace(/[^0-9]/g, '');
       if (!raw) return (note.textContent = '');
-      const { diff, opening } = reconcileEntries(id, parseInt(raw, 10));
+      const { diff, opening } = reconcileEntries(
+        id,
+        parseInt(raw, 10),
+        state.balances,
+        input.dataset.month ?? null
+      );
       note.textContent = opening
-        ? '期首残高として設定します'
+        ? '最初の残高として設定します'
         : diff === 0
           ? 'ぴったり合っています'
           : diff > 0
             ? `${M.yen(diff)} の記録漏れ → 使途不明`
             : `${M.yen(-diff)} 多い → 不明な増加`;
     });
-    row.append(note);
+
+    applyLock();
     box.append(row);
   }
 
@@ -783,7 +838,14 @@ $('update-save').onclick = once($('update-save'), async () => {
 
   for (const input of filled) {
     const value = parseInt(input.value.replace(/[^0-9]/g, ''), 10);
-    entries.push(...reconcileEntries(input.dataset.account, value, balances).entries);
+    entries.push(
+      ...reconcileEntries(
+        input.dataset.account,
+        value,
+        balances,
+        input.dataset.month ?? null
+      ).entries
+    );
   }
 
   const partial = filled.length > 0 && filled.length < inputs.length;
