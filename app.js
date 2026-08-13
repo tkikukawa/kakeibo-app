@@ -13,15 +13,19 @@ const CACHE = 'kakeibo.cache';
 const state = { accounts: {}, categories: {}, rules: [], entries: [], balances: {} };
 
 // --- 画面切り替え -----------------------------------------------------------
-const VIEWS = ['home', 'record', 'count', 'inbox', 'settings'];
+const VIEWS = ['home', 'record', 'count', 'inbox', 'history', 'settings'];
 function show(name) {
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
   window.scrollTo(0, 0);
   if (name === 'record') renderRecord();
   if (name === 'count') renderCount();
   if (name === 'inbox') renderInbox();
+  if (name === 'history') renderHistory();
   if (name === 'settings') renderSettings();
   if (name === 'home') renderHome();
+  // 金額をすぐ打てるよう、数字キーボードを開いておく
+  if (name === 'record') $('rec-amount').focus();
+  if (name === 'count') $('count-actual').focus();
 }
 document.addEventListener('click', (e) => {
   const go = e.target.closest('[data-go]');
@@ -126,6 +130,16 @@ function renderHome() {
   $('home-month').textContent = M.yen(M.monthTotal(state.live ?? [], month));
   $('home-inbox').textContent = `${M.inbox(state.live ?? []).length} 件`;
 
+  // 残高は既定で隠す。人前で開いても金額が見えないようにするため。
+  const shown = localStorage.getItem('kakeibo.showBalance') === '1';
+  $('home-balance-wrap').hidden = !shown;
+  $('home-reveal').textContent = shown ? '隠す' : '表示する';
+  $('home-reveal').setAttribute('aria-pressed', String(shown));
+  if (!shown) {
+    refreshStatus();
+    return;
+  }
+
   const list = $('home-balances');
   list.replaceChildren();
   for (const [id, acc] of Object.entries(state.accounts)) {
@@ -175,8 +189,118 @@ async function refreshStatus() {
   line.style.color = bad || pending ? 'var(--danger)' : 'var(--muted)';
 }
 
-// --- 支出を記録 -------------------------------------------------------------
-let rec = { account: null, category: null };
+$('home-reveal').onclick = () => {
+  const shown = localStorage.getItem('kakeibo.showBalance') === '1';
+  localStorage.setItem('kakeibo.showBalance', shown ? '0' : '1');
+  renderHome();
+};
+$('home-history').onclick = () => show('history');
+
+// --- 記録の履歴・修正 -------------------------------------------------------
+// 追記のみを保つため、修正は「新しい行が古い行を無効にする」形で行う。
+// 元の記録は消えず、Git 履歴にも残る。
+function renderHistory() {
+  const box = $('history-list');
+  box.replaceChildren();
+  const items = M.sortEntries(state.live ?? []).slice(-40).reverse();
+  if (items.length === 0) {
+    box.append(el('p', 'empty', 'まだ記録がありません'));
+    return;
+  }
+  const KIND = { expense: '支出', income: '収入', transfer: '振替', count: '照合' };
+  for (const e of items) {
+    const btn = el('button', 'hist');
+    const row = el('div', 'row');
+    const acc = state.accounts[e.account]?.name ?? e.account;
+    const title =
+      e.kind === 'transfer'
+        ? `${acc} → ${state.accounts[e.counter_account]?.name ?? e.counter_account}`
+        : e.merchant || state.categories[e.category]?.name || acc;
+    row.append(el('span', 'name', title));
+    row.append(el('span', 'amt', M.yen(e.amount)));
+    btn.append(row);
+    const cat = e.category ? ` ・ ${state.categories[e.category]?.name ?? e.category}` : '';
+    btn.append(el('div', 'meta', `${e.date} ・ ${KIND[e.kind] ?? e.kind} ・ ${acc}${cat}`));
+    btn.onclick = () => openEditor(e, btn);
+    box.append(btn);
+  }
+}
+
+function openEditor(entry, anchor) {
+  document.querySelectorAll('.edit').forEach((n) => n.remove());
+  const panel = el('div', 'edit');
+
+  const label = el('div', 'muted small', '正しい金額に直す');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'numeric';
+  input.value = String(entry.amount);
+  panel.append(label, input);
+
+  const actions = el('div', 'actions2');
+  const save = el('button', 'primary', '金額を直す');
+  const del = el('button', 'danger', 'この記録を取り消す');
+  del.style.margin = '0';
+  actions.append(save, del);
+  panel.append(actions);
+
+  save.onclick = async () => {
+    const amount = parseInt((input.value || '').replace(/[^0-9]/g, ''), 10);
+    if (!amount) return banner('金額を入力してください', 'err');
+    if (amount === entry.amount) return banner('金額が変わっていません', 'warn');
+    await amend(
+      { ...entry, id: M.ulid(), ts: M.nowTs(), amount, supersedes: entry.id },
+      `${M.yen(entry.amount)} → ${M.yen(amount)} に直しました`
+    );
+  };
+  del.onclick = async () => {
+    if (!confirm(`${M.yen(entry.amount)} の記録を取り消します。よろしいですか`)) return;
+    await amend(
+      {
+        id: M.ulid(),
+        ts: M.nowTs(),
+        date: entry.date,
+        kind: 'void',
+        amount: 0,
+        account: entry.account,
+        status: 'confirmed',
+        source: 'manual',
+        supersedes: entry.id,
+      },
+      '記録を取り消しました'
+    );
+  };
+
+  anchor.after(panel);
+  input.focus();
+  input.select();
+}
+
+async function amend(entry, okMsg) {
+  state.entries.push(entry);
+  recompute();
+  saveCache();
+  const res = await S.record([entry]);
+  banner(res.sent ? okMsg : `${okMsg}（未送信: ${res.error}）`, res.sent ? 'ok' : 'warn');
+  renderHistory();
+}
+
+// --- 記録する ---------------------------------------------------------------
+let rec = { kind: 'expense', account: null, counter: null, category: null };
+
+const KINDS = [
+  ['expense', '支出'],
+  ['income', '収入'],
+  ['transfer', '振替'],
+];
+
+// 収入用のカテゴリは id が income_ で始まるものと決めている。
+const isIncomeCat = (id) => id.startsWith('income_');
+function categoriesFor(kind) {
+  return Object.entries(state.categories)
+    .filter(([id, c]) => !c.system && (kind === 'income') === isIncomeCat(id))
+    .map(([id, c]) => [id, c.name]);
+}
 
 function chipRow(container, items, selected, onPick) {
   container.replaceChildren();
@@ -190,109 +314,239 @@ function chipRow(container, items, selected, onPick) {
 }
 
 function renderRecord() {
-  const accounts = Object.entries(state.accounts).map(([id, a]) => [id, a.name]);
-  chipRow($('rec-accounts'), accounts, rec.account, (v) => {
-    rec.account = v;
-    renderRecord();
-  });
-  const cats = Object.entries(state.categories)
-    .filter(([, c]) => !c.system)
-    .map(([id, c]) => [id, c.name]);
-  chipRow($('rec-categories'), cats, rec.category, (v) => {
-    rec.category = rec.category === v ? null : v;
+  const { kind } = rec;
+  const isTransfer = kind === 'transfer';
+
+  // 前回選んだ支払い手段を覚えておく。毎日同じ口座を使うことが多いので、
+  // これだけで1タップ減る。
+  if (!rec.account) rec.account = localStorage.getItem(`kakeibo.lastAcct.${kind}`);
+  if (rec.account && !state.accounts[rec.account]) rec.account = null;
+
+  chipRow($('rec-kinds'), KINDS, kind, (v) => {
+    if (rec.kind === v) return;
+    rec = { kind: v, account: null, counter: null, category: null };
     renderRecord();
   });
 
+  const accounts = Object.entries(state.accounts).map(([id, a]) => [id, a.name]);
+  $('rec-account-label').textContent =
+    kind === 'expense' ? '支払い手段' : kind === 'income' ? '入金先' : '出金元';
+  chipRow($('rec-accounts'), accounts, rec.account, (v) => {
+    rec.account = v;
+    if (rec.counter === v) rec.counter = null;
+    renderRecord();
+  });
+
+  $('rec-counter-wrap').hidden = !isTransfer;
+  if (isTransfer) {
+    chipRow(
+      $('rec-counter'),
+      accounts.filter(([id]) => id !== rec.account),
+      rec.counter,
+      (v) => {
+        rec.counter = v;
+        renderRecord();
+      }
+    );
+  }
+
+  $('rec-category-wrap').hidden = isTransfer;
+  if (!isTransfer) {
+    chipRow($('rec-categories'), categoriesFor(kind), rec.category, (v) => {
+      rec.category = rec.category === v ? null : v;
+      renderRecord();
+    });
+  }
+
+  $('rec-merchant-wrap').hidden = isTransfer;
+  $('rec-merchant-label').textContent = kind === 'income' ? '内容' : '店名';
+  $('rec-merchant').placeholder = kind === 'income' ? '給与' : 'ローソン';
+  $('rec-title').textContent = { expense: '支出', income: '収入', transfer: '振替' }[kind];
+
   const acc = state.accounts[rec.account];
-  $('rec-note').textContent = !acc
-    ? '支払い手段を選んでください'
-    : acc.type === 'cash'
-      ? '現金の支出として確定します'
-      : '速報として記録します。後日CSVの明細と自動で統合されます';
+  let note;
+  if (isTransfer) {
+    note = !rec.account
+      ? '出金元を選んでください'
+      : !rec.counter
+        ? '入金先を選んでください'
+        : `${acc.name} → ${state.accounts[rec.counter].name}。総資産は変わりません`;
+  } else if (!acc) {
+    note = kind === 'income' ? '入金先を選んでください' : '支払い手段を選んでください';
+  } else if (kind === 'income') {
+    note = `${acc.name} に入金として記録します`;
+  } else {
+    note =
+      acc.type === 'cash'
+        ? '現金の支出として確定します'
+        : '速報として記録します。後日CSVの明細と自動で統合されます';
+  }
+  $('rec-note').textContent = note;
 }
 
 $('rec-save').onclick = async () => {
   const amount = parseInt(($('rec-amount').value || '').replace(/[^0-9]/g, ''), 10);
   if (!amount) return banner('金額を入力してください', 'err');
-  if (!rec.account) return banner('支払い手段を選んでください', 'err');
-
-  const merchant = $('rec-merchant').value.trim() || null;
-  const acc = state.accounts[rec.account];
-  const isCash = acc.type === 'cash';
-  const category = rec.category ?? M.guessCategory(merchant, state.rules);
+  if (!rec.account) return banner('口座を選んでください', 'err');
+  if (rec.kind === 'transfer' && !rec.counter) return banner('入金先を選んでください', 'err');
 
   const entry = {
     id: M.ulid(),
     ts: M.nowTs(),
     date: M.today(),
-    kind: 'expense',
+    kind: rec.kind,
     amount,
     account: rec.account,
-    status: isCash && category ? 'confirmed' : isCash ? 'pending' : 'provisional',
     source: 'manual',
   };
-  if (category) entry.category = category;
-  if (merchant) entry.merchant = merchant;
 
+  if (rec.kind === 'transfer') {
+    // 振替は総資産を動かさないので、カテゴリも突き合わせも要らない
+    entry.counter_account = rec.counter;
+    entry.status = 'confirmed';
+  } else {
+    const merchant = $('rec-merchant').value.trim() || null;
+    const acc = state.accounts[rec.account];
+    const category = rec.category ?? M.guessCategory(merchant, state.rules);
+    // 現金は明細が後から来ないのでその場で確定。それ以外は速報として明細を待つ
+    entry.status =
+      acc.type === 'cash' ? (category ? 'confirmed' : 'pending') : 'provisional';
+    if (category) entry.category = category;
+    if (merchant) entry.merchant = merchant;
+  }
+
+  const label = { expense: '支出', income: '収入', transfer: '振替' }[rec.kind];
+  localStorage.setItem(`kakeibo.lastAcct.${rec.kind}`, rec.account);
   $('rec-amount').value = '';
   $('rec-merchant').value = '';
-  rec = { account: null, category: null };
-  await commit([entry], `${M.yen(amount)} を記録しました`);
+  rec = { kind: rec.kind, account: null, counter: null, category: null };
+  await commit([entry], `${label} ${M.yen(amount)} を記録しました`);
 };
 
 // --- 財布を数える -----------------------------------------------------------
-function predictedCash() {
-  return state.balances.cash ?? 0;
-}
+let countAccount = 'cash';
+
+// 口座ごとに「何を見て入力するのか」が違うので、文言を変える。
+const COUNT_UI = {
+  cash: {
+    title: '財布を数える',
+    label: '実際に数えた額',
+    openLabel: 'いまの財布の中身',
+    hint: '財布の中身をすべて数えてください',
+  },
+  bank: {
+    title: '残高を照合',
+    label: '銀行アプリの残高',
+    openLabel: 'いまの残高',
+    hint: '銀行アプリで残高を確認してください',
+  },
+  prepaid: {
+    title: '残高を照合',
+    label: 'アプリの残高',
+    openLabel: 'いまの残高',
+    hint: 'PayPay アプリなどで残高を確認してください',
+  },
+  credit: {
+    title: '未払額を照合',
+    label: '未払額',
+    openLabel: 'いまの未払額',
+    hint: 'カード会社の「利用限度額 − ご利用可能額」を入れてください。締め日のズレで合わないことがあるので、無理に照合しなくて構いません',
+  },
+};
+
+const countUi = () => COUNT_UI[state.accounts[countAccount]?.type] ?? COUNT_UI.cash;
+const isCreditCount = () => state.accounts[countAccount]?.type === 'credit';
+
+// その口座に記録が1件も無ければ、これは期首残高の設定。
+// 差額を「不明な増加」ではなく「期首残高」として計上し、収入統計を汚さない。
+const isOpening = () =>
+  !(state.live ?? []).some(
+    (e) => e.account === countAccount || e.counter_account === countAccount
+  );
+
+// credit は残高が負なので、入力も表示も「未払額」として正の数で扱う
+const predictedRaw = () => state.balances[countAccount] ?? 0;
+const predictedShown = () => (isCreditCount() ? -predictedRaw() : predictedRaw());
 
 function renderCount() {
-  $('count-predicted').textContent = M.yen(predictedCash());
-  $('count-actual').value = '';
+  const tracked = Object.entries(state.accounts)
+    .filter(([, a]) => M.isTracked(a))
+    .map(([id, a]) => [id, a.name]);
+  if (!state.accounts[countAccount]) countAccount = tracked[0]?.[0] ?? 'cash';
+
+  chipRow($('count-accounts'), tracked, countAccount, (v) => {
+    countAccount = v;
+    $('count-actual').value = '';
+    renderCount();
+  });
+
+  const ui = countUi();
+  const opening = isOpening();
+  $('count-title').textContent = opening ? '期首残高を入れる' : ui.title;
+  $('count-label').textContent = opening ? ui.openLabel : ui.label;
+  $('count-predicted').textContent = M.yen(predictedShown());
   updateDiff();
 }
 
 function updateDiff() {
   const raw = ($('count-actual').value || '').replace(/[^0-9]/g, '');
   const box = $('count-diff');
+  const opening = isOpening();
   if (!raw) {
     box.className = 'diff';
-    box.textContent = '数えた額を入力すると差額が出ます';
+    box.textContent = opening
+      ? 'この口座の最初の記録です。いまの残高を入れると、そこを出発点にします'
+      : countUi().hint;
     return;
   }
-  const diff = predictedCash() - parseInt(raw, 10);
+  const actual = isCreditCount() ? -parseInt(raw, 10) : parseInt(raw, 10);
+  const diff = predictedRaw() - actual;
   box.className = diff === 0 ? 'diff' : 'diff on';
-  box.textContent =
-    diff === 0
+  box.textContent = opening
+    ? `期首残高として ${M.yen(Math.abs(actual))} を設定します`
+    : diff === 0
       ? 'ぴったり合っています'
       : diff > 0
-        ? `${M.yen(diff)} 少ない → 使途不明として計上します`
+        ? `${M.yen(diff)} 分の記録漏れ → 使途不明として計上します`
         : `${M.yen(-diff)} 多い → 不明な増加として計上します`;
 }
 $('count-actual').addEventListener('input', updateDiff);
 
 $('count-save').onclick = async () => {
   const raw = ($('count-actual').value || '').replace(/[^0-9]/g, '');
-  if (raw === '') return banner('数えた額を入力してください', 'err');
-  const actual = parseInt(raw, 10);
-  const diff = predictedCash() - actual;
-  const base = { ts: M.nowTs(), date: M.today(), account: 'cash', source: 'manual' };
+  if (raw === '') return banner('金額を入力してください', 'err');
+  const actual = isCreditCount() ? -parseInt(raw, 10) : parseInt(raw, 10);
+  const diff = predictedRaw() - actual;
+  const name = state.accounts[countAccount].name;
+  const base = { ts: M.nowTs(), date: M.today(), account: countAccount, source: 'manual' };
 
+  // count は実残高の宣言。残高そのものは動かさず、差額を別の行で計上する。
+  // 何が起きたかがログだけで追えるようにするため、2行に分けている。
   const entries = [
-    { ...base, id: M.ulid(), kind: 'count', amount: actual, status: 'confirmed' },
+    { ...base, id: M.ulid(), kind: 'count', amount: Math.abs(actual), status: 'confirmed' },
   ];
+  const opening = isOpening();
   if (diff !== 0) {
     entries.push({
       ...base,
       id: M.ulid(),
       kind: diff > 0 ? 'expense' : 'income',
       amount: Math.abs(diff),
-      category: diff > 0 ? 'unknown' : 'unknown_income',
+      category: opening ? 'opening' : diff > 0 ? 'unknown' : 'unknown_income',
       status: 'confirmed',
       source: 'reconcile',
-      memo: '現金照合による調整',
+      memo: opening ? `${name}の期首残高` : `${name}の照合による調整`,
     });
   }
-  await commit(entries, diff === 0 ? '照合しました（ぴったり）' : '照合しました');
+  $('count-actual').value = '';
+  await commit(
+    entries,
+    opening
+      ? `${name} の期首残高を設定しました`
+      : diff === 0
+        ? `${name}: ぴったり合っています`
+        : `${name} を照合しました`
+  );
 };
 
 // --- 未処理トレイ -----------------------------------------------------------

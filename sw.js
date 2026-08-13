@@ -32,17 +32,19 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return; // API は素通し
   if (e.request.method !== 'GET') return;
 
-  // アプリ本体は「キャッシュを返しつつ裏で更新」。
-  // オフラインでも即座に開き、オンラインなら次回に最新が入る。
+  // オンラインなら常に最新を取りに行き、失敗したらキャッシュに落ちる。
+  // 「キャッシュ優先で裏で更新」にすると、更新した直後の1回は古い画面が出て
+  // 「直したのに変わらない」ことになるため、正しさを優先する。
+  // アプリ本体は数十KBなので取得コストは無視できる。
   e.respondWith(
-    caches.match(e.request).then((hit) => {
-      const fresh = fetch(e.request)
-        .then((res) => {
-          if (res.ok) caches.open(VERSION).then((c) => c.put(e.request, res.clone()));
-          return res;
-        })
-        .catch(() => hit);
-      return hit || fresh;
-    })
+    fetch(e.request)
+      .then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(e.request, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request).then((hit) => hit || Promise.reject(new Error('offline'))))
   );
 });

@@ -28,7 +28,7 @@
   </div>
 
   <div class="actions">
-    <button class="primary" data-go="record">支出を記録</button>
+    <button class="primary" data-go="record">記録する</button>
     <button class="primary" data-go="count">財布を数える</button>
   </div>
 
@@ -37,21 +37,43 @@
     <strong id="home-inbox">—</strong>
   </button>
 
-  <h2>残高</h2>
-  <ul class="balances" id="home-balances"></ul>
-  <div class="networth">
-    <span>総資産</span><strong id="home-networth">—</strong>
+  <button class="link-row" id="home-history">
+    <span>記録の履歴・修正</span><span aria-hidden="true">›</span>
+  </button>
+
+  <h2 class="reveal-head">
+    <span>残高</span>
+    <button class="reveal" id="home-reveal" aria-pressed="false">表示する</button>
+  </h2>
+  <div id="home-balance-wrap" hidden>
+    <ul class="balances" id="home-balances"></ul>
+    <div class="networth">
+      <span>総資産</span><strong id="home-networth">—</strong>
+    </div>
+    <p class="muted small" id="home-check"></p>
   </div>
-  <p class="muted small" id="home-check"></p>
 </section>
 
-<!-- 支出を記録 -->
+<!-- 記録の履歴 -->
+<section id="view-history" class="view" hidden>
+  <header class="head">
+    <button class="icon" data-go="home" aria-label="戻る">←</button>
+    <div class="date">記録の履歴</div>
+    <span></span>
+  </header>
+  <p class="muted small">修正したい記録をタップしてください。</p>
+  <div id="history-list"></div>
+</section>
+
+<!-- 記録する -->
 <section id="view-record" class="view" hidden>
   <header class="head">
     <button class="icon" data-go="home" aria-label="戻る">←</button>
-    <div class="date">支出を記録</div>
+    <div class="date" id="rec-title">記録する</div>
     <span></span>
   </header>
+
+  <div class="chips seg" id="rec-kinds"></div>
 
   <label class="amount">
     <span class="yen">¥</span>
@@ -59,15 +81,24 @@
            placeholder="0" autocomplete="off" enterkeyhint="done">
   </label>
 
-  <h2>支払い手段</h2>
+  <h2 id="rec-account-label">支払い手段</h2>
   <div class="chips" id="rec-accounts"></div>
 
-  <h2>店名</h2>
-  <input id="rec-merchant" type="text" placeholder="ローソン" autocomplete="off"
-         enterkeyhint="done">
+  <div id="rec-counter-wrap" hidden>
+    <h2>入金先</h2>
+    <div class="chips" id="rec-counter"></div>
+  </div>
 
-  <h2>カテゴリ <span class="muted small">後で決めてもいい</span></h2>
-  <div class="chips" id="rec-categories"></div>
+  <div id="rec-merchant-wrap">
+    <h2 id="rec-merchant-label">店名</h2>
+    <input id="rec-merchant" type="text" placeholder="ローソン" autocomplete="off"
+           enterkeyhint="done">
+  </div>
+
+  <div id="rec-category-wrap">
+    <h2>カテゴリ <span class="muted small">後で決めてもいい</span></h2>
+    <div class="chips" id="rec-categories"></div>
+  </div>
 
   <p class="muted small" id="rec-note"></p>
   <button class="primary big-btn" id="rec-save">記録する</button>
@@ -77,16 +108,19 @@
 <section id="view-count" class="view" hidden>
   <header class="head">
     <button class="icon" data-go="home" aria-label="戻る">←</button>
-    <div class="date">財布を数える</div>
+    <div class="date" id="count-title">財布を数える</div>
     <span></span>
   </header>
 
-  <div class="stat">
+  <h2>どの口座を照合しますか</h2>
+  <div class="chips" id="count-accounts"></div>
+
+  <div class="stat" style="margin-top:16px">
     <div class="muted">アプリの予測</div>
     <div class="big" id="count-predicted">—</div>
   </div>
 
-  <h2>実際に数えた額</h2>
+  <h2 id="count-label">実際に数えた額</h2>
   <label class="amount">
     <span class="yen">¥</span>
     <input id="count-actual" type="text" inputmode="numeric" pattern="[0-9]*"

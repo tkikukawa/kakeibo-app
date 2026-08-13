@@ -128,10 +128,35 @@ input[type=text], input[type=password] {
   padding: 10px 14px; border-radius: 999px; font-size: 15px;
   border: 1px solid var(--line); background: var(--card); min-height: 44px;
 }
+/* 支出 / 収入 / 振替 の切り替え。3等分して押し間違えにくくする */
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 16px; }
+.seg .chip { border-radius: var(--radius); text-align: center; min-height: 48px; font-size: 16px; }
+
 .chip[aria-pressed=true] {
   background: var(--accent-bg); border-color: var(--accent); color: var(--accent);
   font-weight: 500;
 }
+
+.link-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  margin-top: 10px; font-size: 15px; color: var(--muted);
+}
+.reveal-head { display: flex; align-items: center; justify-content: space-between; }
+.reveal {
+  padding: 6px 12px; min-height: 36px; font-size: 13px; border-radius: 999px;
+  color: var(--muted);
+}
+
+/* 履歴の1件。タップで修正パネルが開く */
+.hist { width: 100%; text-align: left; margin-bottom: 8px; }
+.hist .row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.hist .amt { font-variant-numeric: tabular-nums; font-weight: 500; }
+.hist .meta { font-size: 13px; color: var(--muted); }
+.edit {
+  background: var(--card); border: 1px solid var(--border-accent, var(--accent));
+  border-radius: var(--radius); padding: 12px 14px; margin: -4px 0 10px;
+}
+.edit .actions2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 
 .diff {
   margin-top: 16px; padding: 14px 16px; border-radius: var(--radius);
