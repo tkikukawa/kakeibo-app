@@ -17,11 +17,30 @@ export function isTracked(account) {
 }
 
 // 訂正・取り消しを適用して、生きているエントリだけを返す。
+//
 // supersedes で指された id は死ぬ。訂正が連鎖しても最新だけが残る。
+//
+// 同じ行を2回訂正した場合（保存ボタンの連打や、遅い通信での二度押しで起きる）、
+// 訂正が両方とも生き残ると金額が二重に計上される。そうならないよう、
+// 同じ id を指す訂正が複数あるときは最後の1つだけを採用する。
 export function liveEntries(entries) {
   const superseded = new Set();
-  for (const e of entries) if (e.supersedes) superseded.add(e.supersedes);
-  return entries.filter((e) => !superseded.has(e.id) && e.kind !== 'void');
+  const winner = new Map(); // supersedes 先 → 採用する訂正
+  const isNewer = (a, b) => (a.ts === b.ts ? a.id > b.id : a.ts > b.ts);
+
+  for (const e of entries) {
+    if (!e.supersedes) continue;
+    superseded.add(e.supersedes);
+    const prev = winner.get(e.supersedes);
+    if (!prev || isNewer(e, prev)) winner.set(e.supersedes, e);
+  }
+
+  return entries.filter((e) => {
+    if (superseded.has(e.id)) return false; // 訂正された
+    if (e.kind === 'void') return false; // 取り消しそのものは残高に効かない
+    if (e.supersedes && winner.get(e.supersedes).id !== e.id) return false; // 重複した訂正
+    return true;
+  });
 }
 
 export function sortEntries(entries) {

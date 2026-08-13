@@ -65,6 +65,23 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// 送信中はボタンを止める。通信が遅いと二度押しされ、同じ記録が2回書かれる。
+// model.js 側でも重複した訂正は弾くが、そもそも作らせないのが本筋。
+function once(btn, fn) {
+  return async (...args) => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = '送信中…';
+    try {
+      await fn(...args);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  };
+}
+
 let bannerTimer;
 function banner(msg, kind = 'ok', ms = 3000) {
   const b = $('banner');
@@ -270,7 +287,7 @@ function openEditor(entry, anchor) {
   actions.append(save, del);
   panel.append(actions);
 
-  save.onclick = async () => {
+  save.onclick = once(save, async () => {
     const amount = parseInt((input.value || '').replace(/[^0-9]/g, ''), 10);
     if (!amount) return banner('金額を入力してください', 'err');
     if (amount === entry.amount) return banner('金額が変わっていません', 'warn');
@@ -278,8 +295,8 @@ function openEditor(entry, anchor) {
       { ...entry, id: M.ulid(), ts: M.nowTs(), amount, supersedes: entry.id },
       `${M.yen(entry.amount)} → ${M.yen(amount)} に直しました`
     );
-  };
-  del.onclick = async () => {
+  });
+  del.onclick = once(del, async () => {
     if (!confirm(`${M.yen(entry.amount)} の記録を取り消します。よろしいですか`)) return;
     await amend(
       {
@@ -295,7 +312,7 @@ function openEditor(entry, anchor) {
       },
       '記録を取り消しました'
     );
-  };
+  });
 
   anchor.after(panel);
   input.focus();
@@ -410,7 +427,7 @@ function renderRecord() {
   $('rec-note').textContent = note;
 }
 
-$('rec-save').onclick = async () => {
+$('rec-save').onclick = once($('rec-save'), async () => {
   const amount = parseInt(($('rec-amount').value || '').replace(/[^0-9]/g, ''), 10);
   if (!amount) return banner('金額を入力してください', 'err');
   if (!rec.account) return banner('口座を選んでください', 'err');
@@ -447,7 +464,7 @@ $('rec-save').onclick = async () => {
   $('rec-merchant').value = '';
   rec = { kind: rec.kind, account: null, counter: null, category: null };
   await commit([entry], `${label} ${M.yen(amount)} を記録しました`);
-};
+});
 
 // --- 財布を数える -----------------------------------------------------------
 let countAccount = 'cash';
@@ -538,7 +555,7 @@ function updateDiff() {
 }
 $('count-actual').addEventListener('input', updateDiff);
 
-$('count-save').onclick = async () => {
+$('count-save').onclick = once($('count-save'), async () => {
   const raw = ($('count-actual').value || '').replace(/[^0-9]/g, '');
   if (raw === '') return banner('金額を入力してください', 'err');
   const actual = isCreditCount() ? -parseInt(raw, 10) : parseInt(raw, 10);
@@ -573,7 +590,7 @@ $('count-save').onclick = async () => {
         ? `${name}: ぴったり合っています`
         : `${name} を照合しました`
   );
-};
+});
 
 // --- 未処理トレイ -----------------------------------------------------------
 function renderInbox() {
