@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#000000">
 <!-- app.js の APP_VERSION と必ず同じ値にする。
      食い違っていれば新旧が混ざっているので、app.js が自動で入れ直す。 -->
-<meta name="app-version" content="2026-08-13d">
+<meta name="app-version" content="2026-08-13e">
 <title>kakeibo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
@@ -121,10 +121,11 @@
     <span></span>
   </header>
 
-  <h2>どの口座を照合しますか</h2>
-  <div class="chips" id="count-accounts"></div>
+  <p class="muted small">
+    現金だけを毎日ここで合わせます。銀行やカードは「口座情報を更新」から。
+  </p>
 
-  <div class="stat" style="margin-top:16px">
+  <div class="stat">
     <div class="muted">アプリの予測</div>
     <div class="big" id="count-predicted">—</div>
   </div>
@@ -155,14 +156,11 @@
 
   <h2>この期間に入った収入</h2>
   <p class="muted small">
-    給与など。<strong>これを入れないと支出が実際より少なく出ます。</strong>
-    無ければ空欄のままで構いません。
+    給与・振込・返金など。<strong>これを入れないと支出が実際より少なく出ます。</strong>
+    無ければ空欄のままで構いません。複数あれば行を足してください。
   </p>
-  <div class="acct">
-    <input id="update-income" type="text" inputmode="numeric" placeholder="空欄なら収入なし"
-           autocomplete="off">
-    <div class="chips" id="update-income-account" style="margin-top:10px"></div>
-  </div>
+  <div id="update-income-list"></div>
+  <button data-action="add-income">＋ 収入を追加</button>
 
   <button class="primary big-btn" id="update-save">まとめて更新する</button>
 </section>

@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-13d';
+const APP_VERSION = '2026-08-13e';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -90,6 +90,9 @@ const ACTIONS = {
       /* 使えない環境でもリロードは試す */
     }
     location.reload();
+  },
+  'add-income'() {
+    addIncomeRow()?.querySelector('input').focus();
   },
 };
 document.addEventListener('click', (e) => {
@@ -448,10 +451,11 @@ function renderRecord() {
   const acc = state.accounts[rec.account];
   let note;
   if (isTransfer) {
+    // 「振替」だけでは何を入れる場面か伝わらないので、具体例を出す
     note = !rec.account
-      ? '出金元を選んでください'
+      ? 'ATMで下ろした・チャージした、など口座間のお金の移動。出金元を選んでください'
       : !rec.counter
-        ? '入金先を選んでください'
+        ? '入金先を選んでください（ATM出金なら「現金」）'
         : `${acc.name} → ${state.accounts[rec.counter].name}。総資産は変わりません`;
   } else if (!acc) {
     note = kind === 'income' ? '入金先を選んでください' : '支払い手段を選んでください';
@@ -552,17 +556,9 @@ const predictedRaw = () => state.balances[countAccount] ?? 0;
 const predictedShown = () => (isCreditCount() ? -predictedRaw() : predictedRaw());
 
 function renderCount() {
-  const tracked = Object.entries(state.accounts)
-    .filter(([, a]) => M.isTracked(a))
-    .map(([id, a]) => [id, a.name]);
-  if (!state.accounts[countAccount]) countAccount = tracked[0]?.[0] ?? 'cash';
-
-  chipRow($('count-accounts'), tracked, countAccount, (v) => {
-    countAccount = v;
-    $('count-actual').value = '';
-    renderCount();
-  });
-
+  // この画面は現金専用。銀行やカードは「口座情報を更新」でまとめて扱う。
+  // 毎日やるのは現金だけなので、選ばせるだけ手間になる。
+  countAccount = 'cash';
   const ui = countUi();
   const opening = isOpening();
   $('count-title').textContent = opening ? '期首残高を入れる' : ui.title;
@@ -591,7 +587,10 @@ function updateDiff() {
       ? 'ぴったり合っています'
       : diff > 0
         ? `${M.yen(diff)} 分の記録漏れ → 使途不明として計上します`
-        : `${M.yen(-diff)} 多い → 不明な増加として計上します`;
+        : // 予測より多いのは、たいていATMで下ろしたのを記録していないから。
+          // 振替として入れないと支出がその分だけ過大になるので、ここで促す。
+          `${M.yen(-diff)} 多い。ATMで下ろした分なら、先に「支出を記録 → 振替」で` +
+          '入れてください。そうでなければ不明な増加として計上します';
 }
 $('count-actual').addEventListener('input', updateDiff);
 
@@ -688,44 +687,75 @@ function renderUpdate() {
     box.append(row);
   }
 
-  // 収入の入金先。既定は最初の銀行口座。
-  const banks = accounts.filter(([, a]) => a.type === 'bank');
-  const choices = (banks.length ? banks : accounts).map(([id, a]) => [id, a.name]);
-  if (!updateIncomeAccount || !state.accounts[updateIncomeAccount]) {
-    updateIncomeAccount = choices[0]?.[0] ?? null;
-  }
-  chipRow($('update-income-account'), choices, updateIncomeAccount, (v) => {
-    updateIncomeAccount = v;
-    renderUpdate();
-  });
-  $('update-income').value = '';
+  $('update-income-list').replaceChildren();
+  addIncomeRow();
 }
 
-let updateIncomeAccount = null;
+// 収入の入金先の候補。銀行があれば銀行だけに絞る（給与の入り先はほぼ銀行）。
+function incomeChoices() {
+  const accounts = Object.entries(state.accounts).filter(([, a]) => M.isTracked(a));
+  const banks = accounts.filter(([, a]) => a.type === 'bank');
+  return (banks.length ? banks : accounts).map(([id, a]) => [id, a.name]);
+}
+
+// 収入は月に複数あることがある（給与・返金・立替の精算など）。
+// 1行に固定すると合計を頭で足す手間が出るので、行を足せるようにする。
+function addIncomeRow() {
+  const choices = incomeChoices();
+  if (choices.length === 0) return;
+  const row = el('div', 'acct');
+  row.dataset.income = '1';
+  row.dataset.account = choices[0][0];
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'numeric';
+  input.placeholder = '金額';
+  input.autocomplete = 'off';
+
+  const chips = el('div', 'chips');
+  chips.style.marginTop = '10px';
+  const draw = () =>
+    chipRow(chips, choices, row.dataset.account, (v) => {
+      row.dataset.account = v;
+      draw();
+    });
+  draw();
+
+  row.append(input, chips);
+  $('update-income-list').append(row);
+  return row;
+}
 
 $('update-save').onclick = once($('update-save'), async () => {
   const inputs = [...$('update-list').querySelectorAll('input[data-account]')];
   const filled = inputs.filter((i) => i.value.replace(/[^0-9]/g, '') !== '');
-  const incomeRaw = ($('update-income').value || '').replace(/[^0-9]/g, '');
-  if (filled.length === 0 && !incomeRaw) return banner('1つ以上入力してください', 'err');
+
+  const incomes = [...$('update-income-list').querySelectorAll('[data-income]')]
+    .map((row) => ({
+      amount: parseInt((row.querySelector('input').value || '').replace(/[^0-9]/g, ''), 10),
+      account: row.dataset.account,
+    }))
+    .filter((x) => x.amount > 0 && x.account);
+
+  if (filled.length === 0 && incomes.length === 0) {
+    return banner('1つ以上入力してください', 'err');
+  }
 
   // 収入を先に確定させ、それを反映した残高と実額を突き合わせる。
   //   支出 = 期首 + 収入 − 現在の総資産
   // 収入を後回しにすると、その分が丸ごと「使途不明の支出」に化ける。
-  const entries = [];
-  if (incomeRaw && updateIncomeAccount) {
-    entries.push({
-      id: M.ulid(),
-      ts: M.nowTs(),
-      date: M.today(),
-      kind: 'income',
-      amount: parseInt(incomeRaw, 10),
-      account: updateIncomeAccount,
-      category: 'income_salary',
-      status: 'confirmed',
-      source: 'manual',
-    });
-  }
+  const entries = incomes.map((x) => ({
+    id: M.ulid(),
+    ts: M.nowTs(),
+    date: M.today(),
+    kind: 'income',
+    amount: x.amount,
+    account: x.account,
+    category: 'income_salary',
+    status: 'confirmed',
+    source: 'manual',
+  }));
   const balances = M.computeBalances(state.accounts, [...(state.live ?? []), ...entries]);
 
   for (const input of filled) {

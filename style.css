@@ -1,19 +1,19 @@
 :root {
-  --bg: #f7f6f3;
-  --card: #ffffff;
-  --line: #e2e0da;
-  --text: #1c1c1e;
-  --muted: #6f6d68;
-  --accent: #1d6f56;
-  --accent-bg: #e1f5ee;
-  --danger: #a32d2d;
-  --danger-bg: #fceded;
-  --warn-bg: #faeeda;
-  --warn-text: #854f0b;
+  /* 全面黒・文字は白で固定。端末のダークモード設定には追従しない
+     （どの端末でも同じ見え方にするため）。 */
+  --bg: #000000;
+  --card: #141414;
+  --line: #2e2e2e;
+  --text: #ffffff;
+  --muted: #8e8e8e;
+  --accent: #ffffff;
+  --accent-bg: #1f1f1f;
+  --danger: #ff8a8a;
+  --danger-bg: #2a1414;
+  --warn-bg: #241d10;
+  --warn-text: #f0c987;
   --radius: 12px;
-  /* 端末のダークモードには追従しない。金額の視認性を一定に保つため、
-     常に明るい配色で表示する。 */
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -91,8 +91,9 @@ button {
   padding: 14px 16px; min-height: 48px;
 }
 button:active { transform: scale(.99); }
+/* 黒地の中で唯一反転させる要素。白地に黒文字で最も強い */
 .primary {
-  background: var(--accent); color: #fff; border-color: transparent;
+  background: var(--text); color: var(--bg); border-color: transparent;
   font-weight: 500; font-size: 17px; min-height: 60px;
 }
 .big-btn { width: 100%; margin-top: 24px; }
