@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-13e';
+const APP_VERSION = '2026-08-13f';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -642,6 +642,15 @@ $('count-save').onclick = once($('count-save'), async () => {
   );
 });
 
+// その口座を今月すでに照合したか。
+// カードは締め日が月1回なので、記入も月1回に制限する根拠に使う。
+function doneThisMonth(accountId) {
+  const month = M.today().slice(0, 7);
+  return (state.live ?? []).some(
+    (e) => e.kind === 'count' && e.account === accountId && e.date.startsWith(month)
+  );
+}
+
 // --- 口座情報を更新（まとめて照合）-----------------------------------------
 // 現金だけ入れてもいいし、全部入れてもいい。空欄の口座は触らない。
 // 全部まとめて入れると、口座間の移動(ATM出金など)が自動的に相殺される。
@@ -668,9 +677,18 @@ function renderUpdate() {
     input.inputMode = 'numeric';
     input.dataset.account = id;
     input.placeholder = '空欄なら変更しません';
+    // カードは月に1回しか記入しない。締め日の途中で照合すると、
+    // 支出でも何でもない差額が「使途不明」として積まれてしまう。
+    if (isCredit && doneThisMonth(id)) {
+      input.disabled = true;
+      input.placeholder = '今月は記入済み';
+    }
     row.append(input);
 
     const note = el('div', 'meta acct-note');
+    if (input.disabled) {
+      note.textContent = '今月は記入済みです。直すなら「記録の履歴・修正」から';
+    }
     input.addEventListener('input', () => {
       const raw = input.value.replace(/[^0-9]/g, '');
       if (!raw) return (note.textContent = '');
@@ -728,7 +746,7 @@ function addIncomeRow() {
 }
 
 $('update-save').onclick = once($('update-save'), async () => {
-  const inputs = [...$('update-list').querySelectorAll('input[data-account]')];
+  const inputs = [...$('update-list').querySelectorAll('input[data-account]:not(:disabled)')];
   const filled = inputs.filter((i) => i.value.replace(/[^0-9]/g, '') !== '');
 
   const incomes = [...$('update-income-list').querySelectorAll('[data-income]')]
