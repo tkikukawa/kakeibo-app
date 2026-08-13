@@ -4,7 +4,7 @@
 
 // 上げると activate で古いキャッシュが全部消える。
 // アプリ本体を変えたら必ず上げること。
-const VERSION = 'kakeibo-v3';
+const VERSION = 'kakeibo-v4';
 const SHELL = [
   './',
   './index.html',

@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1c1c1e">
+<meta name="theme-color" content="#ffffff">
+<!-- app.js の APP_VERSION と必ず同じ値にする。
+     食い違っていれば新旧が混ざっているので、app.js が自動で入れ直す。 -->
+<meta name="app-version" content="2026-08-13d">
 <title>kakeibo</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
@@ -30,9 +33,8 @@
       <div class="cap">今日の支出</div>
       <div class="num" id="home-today">—</div>
     </div>
-    <div class="figure">
-      <div class="cap">今月の支出</div>
-      <div class="num" id="home-month">—</div>
+    <div class="figure sub">
+      <span>今月</span><span class="num" id="home-month">—</span>
     </div>
   </div>
 

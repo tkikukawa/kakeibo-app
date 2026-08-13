@@ -9,9 +9,41 @@ const el = (tag, cls, text) => {
   return n;
 };
 
-// 画面が古いままかを切り分けられるよう、設定画面に出す。
-// アプリ本体を変えたら sw.js の VERSION と一緒に上げること。
-const APP_VERSION = '2026-08-13c';
+// アプリ本体を変えたら、この3つを必ず一緒に上げること。
+//   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
+const APP_VERSION = '2026-08-13d';
+
+// HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
+// そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
+// 版が食い違っていたら、黙って直す。ループしないよう1回だけ。
+function healVersionSkew() {
+  const html = document.querySelector('meta[name=app-version]')?.content;
+  if (html === APP_VERSION) {
+    sessionStorage.removeItem('kakeibo.healed');
+    return false;
+  }
+  if (sessionStorage.getItem('kakeibo.healed')) {
+    // 直しても揃わない。これ以上リロードしても無駄なので手動操作を促す
+    document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<div class="banner err">版が揃っていません。設定から「アプリを最新にする」を試してください</div>'
+    );
+    return false;
+  }
+  sessionStorage.setItem('kakeibo.healed', '1');
+  (async () => {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch {
+      /* 使えない環境でもリロードは試す */
+    }
+    location.reload();
+  })();
+  return true;
+}
 
 const CACHE = 'kakeibo.cache';
 const state = { accounts: {}, categories: {}, rules: [], entries: [], balances: {} };
@@ -19,7 +51,12 @@ const state = { accounts: {}, categories: {}, rules: [], entries: [], balances: 
 // --- 画面切り替え -----------------------------------------------------------
 const VIEWS = ['home', 'record', 'count', 'update', 'inbox', 'history', 'settings'];
 function show(name) {
-  for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
+  // 要素が欠けていても止まらないようにする。1つ足りないだけで
+  // 画面遷移が丸ごと死ぬと、原因が分からない不具合になる。
+  for (const v of VIEWS) {
+    const el = $(`view-${v}`);
+    if (el) el.hidden = v !== name;
+  }
   window.scrollTo(0, 0);
   if (name === 'record') renderRecord();
   if (name === 'count') renderCount();
@@ -816,6 +853,7 @@ window.addEventListener('online', () => sync({ quiet: true }).then(renderHome));
 window.addEventListener('offline', renderHome);
 
 (async function boot() {
+  if (healVersionSkew()) return; // 入れ直し中。この版では何もしない
   const cached = loadCache();
   if (cached) show('home');
   if (!S.config.ready) {
