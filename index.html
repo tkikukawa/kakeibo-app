@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#ffffff">
 <!-- app.js の APP_VERSION と必ず同じ値にする。
      食い違っていれば新旧が混ざっているので、app.js が自動で入れ直す。 -->
-<meta name="app-version" content="2026-08-14g">
+<meta name="app-version" content="2026-08-14h">
 <title>kakeibo</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=2026-08-14g">
+<link rel="stylesheet" href="style.css?v=2026-08-14h">
 </head>
 <body>
 
@@ -197,6 +197,17 @@
     </div>
   </div>
 
+  <div class="weekhead">
+    <span>1日ごとの支出</span>
+    <span class="weeknav">
+      <button data-action="week-prev" aria-label="前の週">‹</button>
+      <span id="sum-weekrange">—</span>
+      <button data-action="week-next" aria-label="次の週">›</button>
+    </span>
+  </div>
+  <div class="week" id="sum-week"></div>
+  <p class="muted small" id="sum-weektotal"></p>
+
   <dl class="ledger">
     <div><dt>収入</dt><dd id="sum-income">—</dd></div>
     <div><dt>支出</dt><dd id="sum-expense2">—</dd></div>
@@ -254,6 +265,6 @@
   <button class="danger" id="cfg-forget">PAT をこの端末から消す</button>
 </section>
 
-<script type="module" src="app.js?v=2026-08-14g"></script>
+<script type="module" src="app.js?v=2026-08-14h"></script>
 </body>
 </html>

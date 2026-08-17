@@ -144,7 +144,33 @@ export function pace(entries, month, today) {
   const days = new Date(y, m, 0).getDate();
   if (day < 3 || day >= days) return null; // 数日分では予測が暴れる
   const spent = monthTotal(entries, month);
-  return { projected: Math.round((spent / day) * days), day, days };
+  return {
+    perDay: Math.round(spent / day),
+    projected: Math.round((spent / day) * days),
+    day,
+    days,
+  };
+}
+
+// --- 週 ---------------------------------------------------------------------
+// 月曜はじまり。土日を外すと、休日の支出が表から消えて総額と食い違う。
+export function addDays(date, n) {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+export function mondayOf(date) {
+  const d = new Date(`${date}T00:00:00`);
+  return addDays(date, -((d.getDay() + 6) % 7)); // 日曜=0 を月曜=0 に直す
+}
+
+export function weekSpending(entries, monday) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(monday, i);
+    return { date, dow: '月火水木金土日'[i], amount: monthTotal(entries, date) };
+  });
 }
 
 // 記録のある月を古い順に。推移グラフを出してよいかの判定に使う。

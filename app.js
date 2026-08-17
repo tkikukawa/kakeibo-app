@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-14g';
-import * as S from './store.js?v=2026-08-14g';
+import * as M from './model.js?v=2026-08-14h';
+import * as S from './store.js?v=2026-08-14h';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-14g';
+const APP_VERSION = '2026-08-14h';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -96,6 +96,16 @@ const ACTIONS = {
     sessionStorage.removeItem('kakeibo.healed');
     await purgeCaches();
     location.reload();
+  },
+  'week-prev'() {
+    weekMonday = M.addDays(weekMonday ?? M.mondayOf(M.today()), -7);
+    renderSummary();
+  },
+  'week-next'() {
+    const next = M.addDays(weekMonday ?? M.mondayOf(M.today()), 7);
+    if (next > M.mondayOf(M.today())) return; // 先の週には行かせない
+    weekMonday = next;
+    renderSummary();
   },
   'month-prev'() {
     summaryMonth = shiftMonth(summaryMonth ?? M.today().slice(0, 7), -1);
@@ -961,11 +971,45 @@ function renderSummary() {
   $('sum-pace-wrap').hidden = !p;
   if (p) {
     $('sum-pace').textContent =
-      `${p.day}日時点。このペースだと月末 ${M.yen(p.projected)}`;
+      `1日あたり ${M.yen(p.perDay)} ・ 今月は約 ${M.yen(p.projected)} になりそう`;
   }
 
+  renderWeek(live);
   renderBreakdown(live);
   renderTrend(live);
+}
+
+// 1日ごとの支出。月曜はじまりの7日分。
+// 土日も出す。外すと休日の支出が表から消えて、合計と食い違って見える。
+let weekMonday = null;
+
+function renderWeek(live) {
+  if (!weekMonday) weekMonday = M.mondayOf(M.today());
+  const days = M.weekSpending(live, weekMonday);
+  const total = days.reduce((s, d) => s + d.amount, 0);
+  const max = Math.max(...days.map((d) => d.amount), 1);
+  const today = M.today();
+
+  const label = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  $('sum-weekrange').textContent = `${label(weekMonday)} – ${label(M.addDays(weekMonday, 6))}`;
+
+  const box = $('sum-week');
+  box.replaceChildren();
+  for (const d of days) {
+    const col = el('div', 'wcol');
+    // 金額は棒の上に置く。0円の日も棒を1pxだけ残して、記録が無いのか
+    // 使わなかったのかを見た目で潰さない。
+    col.append(el('div', 'wamt', d.amount ? String(d.amount.toLocaleString('ja-JP')) : ''));
+    const bar = el('div', 'wbar');
+    bar.style.height = `${d.amount ? Math.max(4, (d.amount / max) * 100) : 1}%`;
+    if (d.date === today) bar.classList.add('today');
+    if (d.date > today) bar.classList.add('future');
+    col.append(bar);
+    col.append(el('div', 'wdow', d.dow));
+    col.title = `${d.date} ${M.yen(d.amount)}`;
+    box.append(col);
+  }
+  $('sum-weektotal').textContent = `この週の合計 ${M.yen(total)}`;
 }
 
 // カテゴリの色。黒地(#000)向けに選び、検証スクリプトで
@@ -983,10 +1027,10 @@ const CATEGORY_COLORS = {
   fun: '#A652B2', // 紫
 };
 // 使途不明は支出の種類ではなく「情報が無い」状態なので、色を与えず沈める。
-const UNKNOWN_COLOR = '#4A4A4A';
+const UNKNOWN_COLOR = 'var(--cat-unknown)';
 // 色は6つまで。増やすと判別できなくなる。棒には必ず名前と金額が付くので、
 // 同じ灰色でも読み違えることはない。
-const OTHER_COLOR = '#6E6E6E';
+const OTHER_COLOR = 'var(--cat-other)';
 
 function categoryColor(cat) {
   if (cat === 'unknown' || cat === '(未分類)') return UNKNOWN_COLOR;
@@ -1100,7 +1144,7 @@ function renderTrend(live) {
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
   line.setAttribute('points', pts.join(' '));
   line.setAttribute('fill', 'none');
-  line.setAttribute('stroke', '#ffffff');
+  line.setAttribute('stroke', 'currentColor');
   line.setAttribute('stroke-width', '2');
   line.setAttribute('stroke-linecap', 'round');
   line.setAttribute('stroke-linejoin', 'round');
@@ -1109,7 +1153,7 @@ function renderTrend(live) {
   dot.setAttribute('cx', cx);
   dot.setAttribute('cy', cy);
   dot.setAttribute('r', '4');
-  dot.setAttribute('fill', '#ffffff');
+  dot.setAttribute('fill', 'currentColor');
   svg.append(line, dot);
   box.append(svg);
 

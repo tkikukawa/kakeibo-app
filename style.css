@@ -1,19 +1,23 @@
 :root {
-  /* 全面黒・文字は白で固定。端末のダークモード設定には追従しない
+  /* 白地・黒文字で固定。端末のダークモード設定には追従しない
      （どの端末でも同じ見え方にするため）。 */
-  --bg: #000000;
-  --card: #141414;
-  --line: #2e2e2e;
-  --text: #ffffff;
-  --muted: #8e8e8e;
-  --accent: #ffffff;
-  --accent-bg: #1f1f1f;
-  --danger: #ff8a8a;
-  --danger-bg: #2a1414;
-  --warn-bg: #241d10;
-  --warn-text: #f0c987;
+  --bg: #ffffff;
+  --card: #f7f6f3;
+  --line: #e2e0da;
+  --text: #000000;
+  --muted: #6b6a66;
+  --accent: #000000;
+  --accent-bg: #eeece6;
+  --danger: #a32d2d;
+  --danger-bg: #fceded;
+  --warn-bg: #faeeda;
+  --warn-text: #7a4a08;
+  /* グラフの中立色。カテゴリ色は白地・黒地の両方で検証済みなので共通 */
+  --cat-unknown: #b4b2ab;
+  --cat-other: #8a887f;
+  --bar-idle: #d3d1c7;
   --radius: 12px;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -261,7 +265,7 @@ input[type=text], input[type=password] {
 
 .bars { display: flex; align-items: flex-end; gap: 10px; height: 104px; margin-bottom: 4px; }
 .bars .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-.bars .colbar { width: 100%; background: #4a4a4a; border-radius: 4px 4px 0 0; }
+.bars .colbar { width: 100%; background: var(--bar-idle); border-radius: 4px 4px 0 0; }
 .bars .colbar.now { background: var(--text); }
 .bars .meta { font-size: 11px; color: var(--muted); }
 .ends { display: flex; justify-content: space-between; margin-top: 2px; }
@@ -276,3 +280,24 @@ input[type=text], input[type=password] {
 .sticky-save .primary { width: 100%; }
 #rec-merchant-wrap { margin-top: 18px; }
 #rec-merchant-field { margin-top: 8px; }
+
+/* 1日ごとの支出（週） */
+.weekhead {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 26px 0 6px; font-size: 14px; font-weight: 500; color: var(--muted);
+}
+.weeknav { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.weeknav button {
+  background: none; border: none; color: var(--muted);
+  font-size: 18px; min-width: 38px; min-height: 38px; padding: 0;
+}
+.weeknav button:active { color: var(--text); }
+.week { display: flex; align-items: flex-end; gap: 6px; height: 118px; }
+.wcol { flex: 1; display: flex; flex-direction: column; align-items: center;
+        height: 100%; justify-content: flex-end; gap: 4px; }
+.wamt { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums;
+        white-space: nowrap; }
+.wbar { width: 100%; background: var(--bar-idle); border-radius: 3px 3px 0 0; min-height: 1px; }
+.wbar.today { background: var(--text); }
+.wbar.future { background: var(--line); }
+.wdow { font-size: 11px; color: var(--muted); }
