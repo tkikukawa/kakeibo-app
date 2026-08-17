@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-14h';
-import * as S from './store.js?v=2026-08-14h';
+import * as M from './model.js?v=2026-08-14i';
+import * as S from './store.js?v=2026-08-14i';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-14h';
+const APP_VERSION = '2026-08-14i';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
