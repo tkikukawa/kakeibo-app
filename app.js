@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-14f';
-import * as S from './store.js?v=2026-08-14f';
+import * as M from './model.js?v=2026-08-14g';
+import * as S from './store.js?v=2026-08-14g';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-14f';
+const APP_VERSION = '2026-08-14g';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -362,15 +362,29 @@ function openEditor(entry, anchor) {
   document.querySelectorAll('.edit').forEach((n) => n.remove());
   const panel = el('div', 'edit');
 
-  const label = el('div', 'muted small', '正しい金額に直す');
+  const label = el('div', 'muted small', '金額');
   const input = document.createElement('input');
   input.type = 'text';
   input.inputMode = 'numeric';
   input.value = String(entry.amount);
   panel.append(label, input);
 
+  // 振替と照合にはカテゴリが無いので、支出・収入のときだけ出す。
+  let picked = entry.category ?? null;
+  if (entry.kind === 'expense' || entry.kind === 'income') {
+    panel.append(el('div', 'muted small edit-cap', 'カテゴリ'));
+    const chips = el('div', 'chips');
+    const draw = () =>
+      chipRow(chips, categoriesFor(entry.kind), picked, (v) => {
+        picked = picked === v ? null : v;
+        draw();
+      });
+    draw();
+    panel.append(chips);
+  }
+
   const actions = el('div', 'actions2');
-  const save = el('button', 'primary', '金額を直す');
+  const save = el('button', 'primary', 'この内容に直す');
   const del = el('button', 'danger', 'この記録を取り消す');
   del.style.margin = '0';
   actions.append(save, del);
@@ -379,11 +393,21 @@ function openEditor(entry, anchor) {
   save.onclick = once(save, async () => {
     const amount = parseInt((input.value || '').replace(/[^0-9]/g, ''), 10);
     if (!amount) return banner('金額を入力してください', 'err');
-    if (amount === entry.amount) return banner('金額が変わっていません', 'warn');
-    await amend(
-      { ...entry, id: M.ulid(), ts: M.nowTs(), amount, supersedes: entry.id },
-      `${M.yen(entry.amount)} → ${M.yen(amount)} に直しました`
-    );
+    const catChanged = (picked ?? null) !== (entry.category ?? null);
+    if (amount === entry.amount && !catChanged) {
+      return banner('内容が変わっていません', 'warn');
+    }
+    const next = { ...entry, id: M.ulid(), ts: M.nowTs(), amount, supersedes: entry.id };
+    if (picked) next.category = picked;
+    else delete next.category;
+
+    const parts = [];
+    if (amount !== entry.amount) parts.push(`${M.yen(entry.amount)} → ${M.yen(amount)}`);
+    if (catChanged) {
+      const nameOf = (c) => (c ? (state.categories[c]?.name ?? c) : 'なし');
+      parts.push(`${nameOf(entry.category)} → ${nameOf(picked)}`);
+    }
+    await amend(next, `${parts.join(' / ')} に直しました`);
   });
   del.onclick = once(del, async () => {
     if (!confirm(`${M.yen(entry.amount)} の記録を取り消します。よろしいですか`)) return;
@@ -460,7 +484,11 @@ function renderRecord() {
     renderRecord();
   });
 
-  const accounts = Object.entries(state.accounts).map(([id, a]) => [id, a.name]);
+  // Suica のようにチャージ時点で支出計上する口座は、支払い手段に出さない。
+  // チャージ元（楽天カード）で記録済みなので、ここで選ぶと二重になる。
+  const accounts = Object.entries(state.accounts)
+    .filter(([, a]) => M.isTracked(a))
+    .map(([id, a]) => [id, a.name]);
   $('rec-account-label').textContent =
     kind === 'expense' ? '支払い手段' : kind === 'income' ? '入金先' : '出金元';
   chipRow($('rec-accounts'), accounts, rec.account, (v) => {
@@ -978,18 +1006,20 @@ function renderBreakdown(live) {
     $('sum-unknown').textContent = '';
     return;
   }
-  const max = rows[0][1];
+  // 棒の長さは「支出全体に対する割合」。最大値を基準にすると、
+  // 1位が常に満杯になって全体の中でどれくらいかが読めなくなる。
   const sum = rows.reduce((s, [, v]) => s + v, 0);
 
   rows.forEach(([cat, amount]) => {
     const name = state.categories[cat]?.name ?? cat;
     const row = el('div', 'bar');
+    const pct = (amount / sum) * 100;
     const head = el('div', 'row');
     head.append(el('span', null, name));
-    head.append(el('span', 'meta', M.yen(amount)));
+    head.append(el('span', 'meta', `${M.yen(amount)}　${Math.round(pct)}%`));
     const track = el('div', 'track');
     const fill = el('div', 'fill');
-    fill.style.width = `${Math.max(2, (amount / max) * 100)}%`;
+    fill.style.width = `${Math.max(1, pct)}%`;
     fill.style.background = categoryColor(cat);
     track.append(fill);
     row.append(head, track);

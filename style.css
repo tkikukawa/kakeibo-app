@@ -198,6 +198,9 @@ input[type=text], input[type=password] {
   background: var(--card); border: 1px solid var(--border-accent, var(--accent));
   border-radius: var(--radius); padding: 12px 14px; margin: -4px 0 10px;
 }
+.edit .edit-cap { margin-top: 12px; }
+.edit .chips { margin-top: 6px; }
+.edit .chip { padding: 8px 12px; font-size: 13px; min-height: 40px; }
 .edit .actions2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 
 .diff {
