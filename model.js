@@ -173,6 +173,51 @@ export function weekSpending(entries, monday) {
   });
 }
 
+// --- カードの引き落とし -------------------------------------------------------
+// カードは「◯月分の請求額」を1つ記録すれば、それがそのまま翌月に引き落とされる。
+// 金額はすでに分かっているので、引き落としを別に入力させる必要はない。
+//
+//   7月分の請求 143,727 を記録  →  8/27 に 楽天銀行 → 楽天カード 143,727
+
+export function settleDateFor(month, settleDay) {
+  const [y, m] = month.split('-').map(Number);
+  const lastDay = new Date(y, m + 1, 0).getDate(); // 翌月の末日
+  const day = Math.min(settleDay, lastDay); // 31日指定で2月に落ちないように
+  const p = (x) => String(x).padStart(2, '0');
+  return `${y + (m === 12 ? 1 : 0)}-${p(m === 12 ? 1 : m + 1)}-${p(day)}`;
+}
+
+// まだ振替として記録していない引き落としを拾う。
+// 「請求を記録した」ことと「引き落とされた」ことは別なので、
+// 引き落とし日を過ぎたものだけを対象にする。
+export function pendingSettlements(accounts, entries, today) {
+  const out = [];
+  for (const [id, acc] of Object.entries(accounts)) {
+    if (acc.type !== 'credit' || !acc.settle_account || !acc.settle_day) continue;
+    for (const e of entries) {
+      if (e.kind !== 'count' || e.account !== id) continue;
+      if (e.amount <= 0) continue; // 0円の宣言から振替は生まれない
+      const month = entryMonth(e);
+      const date = settleDateFor(month, acc.settle_day);
+      if (date > today) continue; // まだ引き落とされていない
+      const done = entries.some(
+        (x) => x.kind === 'transfer' && x.counter_account === id && x.settles === month
+      );
+      if (done) continue;
+      out.push({
+        card: id,
+        cardName: acc.name,
+        from: acc.settle_account,
+        fromName: accounts[acc.settle_account]?.name ?? acc.settle_account,
+        month,
+        date,
+        amount: e.amount,
+      });
+    }
+  }
+  return out;
+}
+
 // 記録のある月を古い順に。推移グラフを出してよいかの判定に使う。
 export function monthsWithData(entries) {
   const set = new Set();

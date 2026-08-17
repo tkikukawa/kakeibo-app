@@ -1,5 +1,5 @@
-import * as M from './model.js?v=2026-08-14i';
-import * as S from './store.js?v=2026-08-14i';
+import * as M from './model.js?v=2026-08-14j';
+import * as S from './store.js?v=2026-08-14j';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -11,7 +11,7 @@ const el = (tag, cls, text) => {
 
 // アプリ本体を変えたら、この3つを必ず一緒に上げること。
 //   app.js の APP_VERSION / index.html の meta[app-version] / sw.js の VERSION
-const APP_VERSION = '2026-08-14i';
+const APP_VERSION = '2026-08-14j';
 
 // HTML と JS が別々にキャッシュされ、新旧が混ざることがある。
 // そうなるとボタンが無反応になったり画面が空になったりして原因が分かりにくい。
@@ -621,10 +621,10 @@ const COUNT_UI = {
     hint: 'PayPay アプリなどで残高を確認してください',
   },
   credit: {
-    title: '未払額を照合',
-    label: '未払額',
+    title: '請求額を記録',
+    label: '請求額（確定額）',
     openLabel: 'いまの未払額',
-    hint: 'カード会社の「利用限度額 − ご利用可能額」を入れてください。締め日のズレで合わないことがあるので、無理に照合しなくて構いません',
+    hint: '締め後に確定した請求額を入れてください。翌月の引き落としはこの金額から自動で記録されます',
   },
 };
 
@@ -848,8 +848,32 @@ function renderUpdate() {
     box.append(row);
   }
 
+  renderSettlements();
   $('update-income-list').replaceChildren();
   addIncomeRow();
+}
+
+// 引き落としは「◯月分の請求額」から金額が分かるので、入力させない。
+// ただし黙って記録すると何が起きたか分からなくなるので、必ず画面に出す。
+function renderSettlements() {
+  const box = $('update-settle');
+  box.replaceChildren();
+  const pending = M.pendingSettlements(state.accounts, state.live ?? [], M.today());
+  if (pending.length === 0) return;
+
+  box.append(el('h2', null, '引き落とし'));
+  box.append(
+    el('p', 'muted small', '請求額から金額が分かるので、更新するときに自動で記録します。')
+  );
+  for (const s of pending) {
+    const row = el('div', 'acct');
+    const head = el('div', 'row');
+    head.append(el('span', 'name', `${s.cardName} ${Number(s.month.slice(5, 7))}月分`));
+    head.append(el('span', 'amt', M.yen(s.amount)));
+    row.append(head);
+    row.append(el('div', 'meta', `${s.date} ・ ${s.fromName} から引き落とし`));
+    box.append(row);
+  }
 }
 
 // 収入の入金先の候補。銀行があれば銀行だけに絞る（給与の入り先はほぼ銀行）。
@@ -899,7 +923,8 @@ $('update-save').onclick = once($('update-save'), async () => {
     }))
     .filter((x) => x.amount > 0 && x.account);
 
-  if (filled.length === 0 && incomes.length === 0) {
+  const settlements = M.pendingSettlements(state.accounts, state.live ?? [], M.today());
+  if (filled.length === 0 && incomes.length === 0 && settlements.length === 0) {
     return banner('1つ以上入力してください', 'err');
   }
 
@@ -917,6 +942,22 @@ $('update-save').onclick = once($('update-save'), async () => {
     status: 'confirmed',
     source: 'manual',
   }));
+  for (const s of M.pendingSettlements(state.accounts, state.live ?? [], M.today())) {
+    entries.push({
+      id: M.ulid(),
+      ts: M.nowTs(),
+      date: s.date,
+      kind: 'transfer',
+      amount: s.amount,
+      account: s.from,
+      counter_account: s.card,
+      status: 'confirmed',
+      source: 'manual',
+      settles: s.month, // 同じ請求を二重に引き落とさないための印
+      memo: `${s.cardName} ${Number(s.month.slice(5, 7))}月分の引き落とし`,
+    });
+  }
+
   const balances = M.computeBalances(state.accounts, [...(state.live ?? []), ...entries]);
 
   for (const input of filled) {
